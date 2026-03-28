@@ -49,11 +49,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.baseDamage = 10;
     this.attackCooldownMs = 250;
     this.attackDurationMs = 300;
+    this.hitDurationMs = 250;
     this.attackRange = 110;
     this.attackWidth = 50;
     this.attackHeight = 80;
     this.lastAttackAt = -this.attackCooldownMs;
     this.attackUntil = 0;
+    this.hitUntil = 0;
     this.attackId = 0;
 
     // Другие стейты
@@ -160,7 +162,7 @@ export class Character extends Phaser.GameObjects.Container {
       }
     }
 
-    if (!this.isAttacking()) {
+    if (!this.isAttacking() && !this.isHit()) {
       if (!isGrounded) {
         this.setAnimation(this.hitbox.body.velocity.y < 0 ? 'jump' : 'fly');
       } else if (this.wallSlideState.isActive) {
@@ -270,13 +272,23 @@ export class Character extends Phaser.GameObjects.Container {
     this.playAttackAnimation();
   }
 
+  playHitAnimation(now = this.scene.time.now) {
+    this.hitUntil = now + this.hitDurationMs;
+    this.anim.off('complete');
+    this.anim.play('hit_1');
+    this.anim.on('complete', () => {
+      this.anim.off('complete');
+      this.currentAnimation = '';
+    });
+  }
+
   applyRemoteState(x, y, now = this.scene.time.now) {
     const movedX = x - this.x;
     const movedY = y - this.y;
     const isMoving = Math.abs(movedX) > 1;
     this.setPosition(x, y);
     if (movedX !== 0) this.applyFacingDirection(movedX < 0 ? -1 : 1);
-    if (!this.isAttacking()) {
+    if (!this.isAttacking() && !this.isHit()) {
       if (Math.abs(movedY) > 1) {
         this.setAnimation(movedY < 0 ? 'jump' : 'fly');
       } else {
@@ -288,6 +300,10 @@ export class Character extends Phaser.GameObjects.Container {
 
   isAttacking() {
     return this.scene.time.now < this.attackUntil;
+  }
+
+  isHit() {
+    return this.scene.time.now < this.hitUntil;
   }
 
   getAttackDamage() {
@@ -335,6 +351,7 @@ export class Character extends Phaser.GameObjects.Container {
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
     this.syncHpText();
+    this.playHitAnimation();
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
