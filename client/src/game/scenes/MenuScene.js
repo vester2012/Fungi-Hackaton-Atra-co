@@ -19,19 +19,19 @@ export class MenuScene extends Phaser.Scene {
     this.add.rectangle(width * 0.5, height * 0.5, 900, 560, 0x111827, 0.92);
 
     this.add.text(width * 0.5, 120, 'Fungi Hackaton', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '54px',
       color: '#f8fafc'
     }).setOrigin(0.5);
 
     this.add.text(width * 0.5, 174, 'Main menu', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '22px',
       color: '#94a3b8'
     }).setOrigin(0.5);
 
     const statusText = this.add.text(width * 0.5, height - 110, 'Choose an action', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '20px',
       color: '#cbd5e1'
     }).setOrigin(0.5);
@@ -57,7 +57,7 @@ export class MenuScene extends Phaser.Scene {
     const button = this.add.rectangle(x, y, width, height, color, 1).setInteractive({ useHandCursor: true });
 
     const text = this.add.text(x, y, label, {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '26px',
       color: '#f8fafc'
     }).setOrigin(0.5);

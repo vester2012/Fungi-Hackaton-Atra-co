@@ -3,7 +3,7 @@ const Phaser = window.Phaser;
 export class DamagePopup extends Phaser.GameObjects.Text {
   constructor(scene, x, y, amount, options = {}) {
     super(scene, x, y, `-${amount}`, {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: options.fontSize ?? '26px',
       color: options.color ?? '#fca5a5',
       stroke: options.stroke ?? '#450a0a',

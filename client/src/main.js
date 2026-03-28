@@ -3,7 +3,15 @@ import { io } from "socket.io-client";
 import { bootGame } from './game/bootGame.js';
 import {unit_manager} from "./game/unit_manager.js";
 
-bootGame('app');
+async function startGame() {
+    if (document.fonts?.load) {
+        await document.fonts.load('16px "JungleAdventurer"');
+    }
+
+    bootGame('app');
+}
+
+startGame();
 
 
 

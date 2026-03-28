@@ -35,13 +35,13 @@ export class MainScene extends Phaser.Scene {
 
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '42px',
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);
 
     this.add.text(viewWidth * 0.5, 138, 'Greybox map prototype', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '20px',
       color: '#cbd5e1'
     }).setOrigin(0.5).setScrollFactor(0);
@@ -51,7 +51,7 @@ export class MainScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     const backLabel = this.add.text(viewWidth * 0.5, viewHeight - 90, 'Back To Menu', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '24px',
       color: '#111827'
     }).setOrigin(0.5).setScrollFactor(0);
@@ -113,7 +113,7 @@ export class MainScene extends Phaser.Scene {
       this.textInfo.setText("info socket:" + "\n" + str)
 
     } else {
-      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'Arial', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
+      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
     }
   }
 
@@ -190,7 +190,7 @@ export class MainScene extends Phaser.Scene {
       .setStrokeStyle(5 * s, 0xffcc80, 0.9);
 
     this.add.text(playerSpawn.x + 40 * s, playerSpawn.y - 6 * s, 'Spawn', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: `${20 * s}px`,
       color: '#fff3e0'
     });
@@ -314,7 +314,7 @@ export class MainScene extends Phaser.Scene {
 
   createHud(viewWidth) {
     this.controlsText = this.add.text(viewWidth - 42, 34, 'WASD move | Space jump | Enter attack', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '18px',
       color: '#cbd5e1',
       align: 'right'
@@ -329,7 +329,7 @@ export class MainScene extends Phaser.Scene {
 
   createDebugZoomControls(viewWidth) {
     const zoomLabel = this.add.text(viewWidth - 210, 42, 'Zoom', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '20px',
       color: '#e2e8f0'
     }).setScrollFactor(0);
@@ -356,7 +356,7 @@ export class MainScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     const text = this.add.text(x, y, label, {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '28px',
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);

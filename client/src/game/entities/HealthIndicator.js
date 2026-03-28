@@ -16,7 +16,7 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     this.barRadius = options.barRadius ?? 6;
 
     this.hpText = scene.add.text(0, this.textOffsetY, '', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '18px',
       color: this.textColor,
       stroke: this.textStroke,
@@ -39,7 +39,6 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     const fillWidth = this.maxWidth * hpRatio;
 
     this.hpText.setText(`HP ${currentHp}/${safeMaxHp}`);
-    
 
     this.barBg.clear();
     this.barBg.fillStyle(this.barBgColor, 1);
