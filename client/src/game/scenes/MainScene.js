@@ -3,6 +3,8 @@ import { Enemy } from '../entities/Enemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
+import {WallSlideZone} from "../systems/WallSlideZone";
+import {ZoneManager} from "../systems/ZoneManager";
 import {utils} from "../utils.js";
 
 const Phaser = window.Phaser;
@@ -29,8 +31,12 @@ export class MainScene extends Phaser.Scene {
     this.drawBackground(this.worldWidth, this.worldHeight);
     this.drawMap(this.worldWidth, this.worldHeight);
     this.createCollisionMap(this.worldWidth, this.worldHeight);
+    this.zoneManager = new ZoneManager(this);
+    this.createZones(this.worldWidth, this.worldHeight);
     this.createCharacter();
+    this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();
+    this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
     this.createHud(viewWidth);
     this.createBlackHole();
 
@@ -68,6 +74,31 @@ export class MainScene extends Phaser.Scene {
     this.createDebugZoomControls(viewWidth);
   }
 
+
+  createZones(width, height) {
+    const s = WORLD_SCALE;
+    const isDebug = true; // Включи для предпросмотра (зоны будут розовыми)
+
+    // Пример: добавляем зону скольжения на правую стену прямоугольника (185x 857y)
+    // Параметры Rectangle: x (центр), y (центр), width, height
+    // Указываем direction: -1 (персонаж прилипнет, если нажмет влево)
+    this.zoneManager.addZone(
+        new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, {
+          direction: -1,
+          debug: isDebug
+        })
+    );
+
+    // Добавляем зону скольжения на левую стену (direction: 1)
+    this.zoneManager.addZone(
+        new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, {
+          direction: 1,
+          debug: isDebug
+        })
+    );
+
+    // И так далее. Теперь ты можешь навешивать WallSlideZone поверх любых стен!
+  }
   update() {
     if (this.character) {
       this.character.update();
@@ -438,7 +469,7 @@ export class MainScene extends Phaser.Scene {
   createBlackHole(position = {x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE}){
     this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
     this.animHole.setScale(0.5);
-  
+
     this.blackHoleZone = this.add.zone(
       this.animHole.x - 35 * WORLD_SCALE,
       this.animHole.y - 15 * WORLD_SCALE,
@@ -471,9 +502,9 @@ export class MainScene extends Phaser.Scene {
     console.log('Персонаж коснулся черной дыры');
 
     const target = this.character.getPhysicsTarget();
-    
+
     const x = Phaser.Math.Between(100, this.worldWidth - 100);
-    const y = Phaser.Math.Between(100, this.worldHeight - 100);
+    const y = Phaser.Math.Between(100, this.worldHeight - 600);
 
     // телепорт
     this.tweens.add({
