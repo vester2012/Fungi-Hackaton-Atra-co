@@ -1,5 +1,5 @@
-import { MainScene } from './scenes/MainScene.js';
-import { MenuScene } from './scenes/MenuScene.js';
+import { MainScene } from "./scenes/MainScene.js";
+import { MenuScene } from "./scenes/MenuScene.js";
 
 export function bootGame(parent) {
   const Phaser = window.Phaser;
@@ -10,29 +10,29 @@ export function bootGame(parent) {
     parent,
     width: 1920,
     height: 1080,
-    backgroundColor: '#10151f',
+    backgroundColor: "#10151f",
     physics: {
-      default: 'arcade',
+      default: "arcade",
       arcade: {
         gravity: { y: 1800 },
-        debug: false
-      }
+        debug: false,
+      },
     },
     scale: {
       mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH
+      autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     plugins: {
       scene: SpinePlugin
         ? [
             {
-              key: 'SpinePlugin',
+              key: "SpinePlugin",
               plugin: SpinePlugin,
-              mapping: 'spine'
-            }
+              mapping: "spine",
+            },
           ]
-        : []
+        : [],
     },
-    scene: [MenuScene, MainScene]
+    scene: [MenuScene, MainScene],
   });
 }
