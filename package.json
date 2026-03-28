@@ -17,6 +17,8 @@
     "start:server": "npm run start --workspace server"
   },
   "dependencies": {
+    "express": "^4.19.2",
+    "nvm": "^0.0.4",
     "socket.io": "^4.8.3"
   }
 }
