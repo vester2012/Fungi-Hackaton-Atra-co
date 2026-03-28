@@ -89,9 +89,11 @@ export class Character extends Phaser.GameObjects.Container {
     this.events = new Phaser.Events.EventEmitter();
   }
 
-  update() {
+  // Обновляем сигнатуру метода
+  update(time, delta) {
     this.controller.update();
-    const now = this.scene.time.now;
+    const now = time; // Используем время из аргумента
+    const dt = delta / 1000; // Дельта в секундах для расчетов
 
     const leftPressed = this.controller.left;
     const rightPressed = this.controller.right;
@@ -102,7 +104,6 @@ export class Character extends Phaser.GameObjects.Container {
     const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
     const movingHorizontally = leftPressed !== rightPressed;
 
-    // 1. Сброс состояния Wall Slide (если зона не обновила его в текущем кадре)
     if (now - this.wallSlideState.lastActiveTime > 100) {
       this.wallSlideState.isActive = false;
     }
@@ -112,11 +113,9 @@ export class Character extends Phaser.GameObjects.Container {
       this.wallSlideState.isActive = false;
     }
 
-    // 2. Логика прыжка (обычный или Wall Jump)
     if (jumpPressed) {
       if (this.wallSlideState.isActive && !isGrounded) {
-        // ПРЫЖОК ОТ СТЕНЫ
-        const jumpDir = -this.wallSlideState.direction; // В противоположную от стены сторону
+        const jumpDir = -this.wallSlideState.direction;
         this.hitbox.body.setVelocity(
             jumpDir * this.wallJumpForceX,
             -this.wallJumpForceY
@@ -125,21 +124,17 @@ export class Character extends Phaser.GameObjects.Container {
         this.jumpCount = 1;
         this.wallSlideState.isActive = false;
       } else if (this.jumpCount < this.maxJumps) {
-        // ОБЫЧНЫЙ ПРЫЖОК
         this.hitbox.body.setVelocityY(-this.jumpSpeed);
         this.jumpCount += 1;
       }
     }
 
-    // 3. Замедление падения на стене
     if (this.wallSlideState.isActive && !isGrounded) {
       if (this.hitbox.body.velocity.y > this.wallSlideMaxSpeed) {
         this.hitbox.body.setVelocityY(this.wallSlideMaxSpeed);
       }
     }
 
-    // 4. Горизонтальное движение
-    // Если мы только что отпрыгнули от стены, даем физике поработать, не перебивая velocityX сразу
     const isWallJumping = !isGrounded && Math.abs(this.hitbox.body.velocity.x) > this.moveSpeed;
 
     if (!isWallJumping) {
@@ -154,32 +149,25 @@ export class Character extends Phaser.GameObjects.Container {
       }
     }
 
-    // 5. Платформы (Drop Through)
     if (downPressed) {
-      // Я чуть увеличил окно двойного клика (с 250 до 350 мс), чтобы было легче нажимать
       if (now - this.lastDownTapAt <= 350 && isGrounded && this.isStandingOnDropThroughPlatform()) {
         this.dropThroughUntil = now + this.dropThroughDurationMs;
-
-        // ВАЖНО: сдвигаем хитбокс принудительно на 5 пикселей вниз, чтобы пройти границу (platform.top)
-        this.hitbox.y += 5;
-
-        // Даем начальную скорость вниз
+        // Delta time fix: вместо жесткого +5, сдвигаем на величину, зависящую от скорости падения
+        this.hitbox.y += 300 * dt;
         this.hitbox.body.setVelocityY(200);
       }
       this.lastDownTapAt = now;
     }
 
-    // 6. Атака
     if (attackPressed) {
       if (this.tryAttack(now)) {
         this.playAttackAnimation();
       }
     }
 
-    // 7. Анимации
     if (!this.isAttacking()) {
       if (this.wallSlideState.isActive && !isGrounded) {
-        this.setAnimation('idle', true); // Здесь можно поставить спец. анимацию стены
+        this.setAnimation('idle', true);
       } else {
         this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
       }
@@ -365,24 +353,30 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
+    // 1. Снимаем все слушатели с собственного эмиттера
+    if (this.events) {
+      this.events.removeAllListeners();
+      this.events.shutdown();
+    }
+
+    // 2. Явно уничтожаем Spine объект
+    if (this.anim) {
+      this.anim.destroy();
+      this.anim = null;
+    }
+
     if (this.healthIndicator) {
       this.healthIndicator.destroy();
-      this.healthIndicator = null;
     }
 
     if (this.attackHitbox) {
       this.attackHitbox.destroy();
-      this.attackHitbox = null;
     }
 
     if (this.hitbox) {
+      // Важно для Arcade Physics: убираем тело из симуляции
+      this.scene.physics.world.disableBody(this.hitbox.body);
       this.hitbox.destroy();
-      this.hitbox = null;
-    }
-
-    // Если нужно, чистим ивенты инпута
-    if (this.controller) {
-      this.controller = null;
     }
 
     super.destroy(fromScene);

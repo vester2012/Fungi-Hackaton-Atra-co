@@ -3,6 +3,12 @@ export class ZoneManager {
         this.scene = scene;
         this.zones = scene.physics.add.staticGroup();
     }
+    destroy() {
+        // Очистка физической группы
+        if (this.zones) {
+            this.zones.clear(true, true);
+        }
+    }
 
     addZone(zoneInstance) {
         this.zones.add(zoneInstance);
