@@ -31,6 +31,8 @@ export class MainScene extends Phaser.Scene {
     this.createCharacter();
     this.createEnemiesBot();
     this.createHud(viewWidth);
+    this.createBlackHole();
+
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'Arial',
@@ -378,5 +380,63 @@ export class MainScene extends Phaser.Scene {
 
     graphics.fillStyle(0x000000, 0.08);
     graphics.fillRoundedRect(x + 14 * s, y + 18 * s, width - 28 * s, height - 30 * s, 14 * s);
+  }
+
+  createBlackHole(position = {x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE}){
+    this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
+    this.animHole.setScale(0.5);
+  
+    this.blackHoleZone = this.add.zone(
+      this.animHole.x - 35 * WORLD_SCALE,
+      this.animHole.y - 15 * WORLD_SCALE,
+      80 * WORLD_SCALE,
+      50 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(this.blackHoleZone);
+
+    this.blackHoleZone.body.setAllowGravity(false);
+    this.blackHoleZone.body.setImmovable(true);
+
+    this.physics.add.collider(
+      this.character.getPhysicsTarget(),
+      this.platforms
+    );
+
+    this.physics.add.overlap(
+      this.character.getPhysicsTarget(),
+      this.blackHoleZone,
+      this.onBlackHoleTouch,
+      null,
+      this
+    );
+  }
+
+  onBlackHoleTouch(characterBody, holeZone) {
+    if (this.isBlackHoleTriggered) return;
+    this.isBlackHoleTriggered = true;
+    console.log('Персонаж коснулся черной дыры');
+
+    const target = this.character.getPhysicsTarget();
+
+    // телепорт
+    this.tweens.add({
+      targets: this.character,
+      alpha: 0,
+      scaleX: 0.1,
+      scaleY: 0.1,
+      duration: 300
+    });
+    this.tweens.add({
+      targets: target,
+      alpha: 0,
+      duration: 700,
+      onComplete: () => {
+        target.setPosition(180 * WORLD_SCALE, 550 * WORLD_SCALE);
+        this.character.setAlpha(1);
+        this.character.setScale(1);
+        this.isBlackHoleTriggered = false;
+      }
+    });
   }
 }

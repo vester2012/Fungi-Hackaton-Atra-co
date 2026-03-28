@@ -1,0 +1,30 @@
+blackhole_anim_spine.webp
+size: 1024, 1024
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+core
+  index: -1
+  rotate: false
+  bounds: 40, 40, 300, 300
+  offsets: 0, 0, 300, 300
+disk_back
+  index: -1
+  rotate: false
+  bounds: 340, 40, 620, 180
+  offsets: 0, 0, 620, 180
+spiral
+  index: -1
+  rotate: false
+  bounds: 40, 390, 520, 520
+  offsets: 0, 0, 520, 520
+disk_front
+  index: -1
+  rotate: false
+  bounds: 340, 300, 620, 180
+  offsets: 0, 0, 620, 180
+glow
+  index: -1
+  rotate: false
+  bounds: 300, 720, 680, 220
+  offsets: 0, 0, 680, 220
