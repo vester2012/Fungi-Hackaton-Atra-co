@@ -32,7 +32,7 @@ export class MainScene extends Phaser.Scene {
     this.drawMap(this.worldWidth, this.worldHeight);
     this.createCollisionMap(this.worldWidth, this.worldHeight);
     this.zoneManager = new ZoneManager(this);
-    this.createZones(worldWidth, worldHeight);
+    this.createZones(this.worldWidth, this.worldHeight);
     this.createCharacter();
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();

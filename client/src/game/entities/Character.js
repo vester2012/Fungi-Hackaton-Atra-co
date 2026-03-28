@@ -254,7 +254,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackUntil = now + this.attackDurationMs;
     this.attackId += 1;
     this.syncAttackHitbox();
-this.events.emit('attack');
+    this.events.emit('attack');
 
     if (unit_manager.socket) unit_manager.socket.emit('playerAttack', { attackId: this.attackId });
     return true;
