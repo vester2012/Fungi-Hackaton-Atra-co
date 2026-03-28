@@ -227,7 +227,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   createCharacter() {
-    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE);
+    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: true });
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
     this.physics.add.collider(
@@ -299,7 +299,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   createEnemy() {
-    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE);
+    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: false });
     enemy.setDepth(1);
     this.physics.add.collider(
         enemy.getPhysicsTarget(),
@@ -311,42 +311,18 @@ export class MainScene extends Phaser.Scene {
   }
 
   createHud(viewWidth) {
-    this.hpText = this.add.text(42, 34, '', {
-      fontFamily: 'Arial',
-      fontSize: '24px',
-      color: '#f8fafc'
-    }).setScrollFactor(0).setDepth(20);
-
-    this.attackText = this.add.text(42, 68, '', {
-      fontFamily: 'Arial',
-      fontSize: '20px',
-      color: '#fdba74'
-    }).setScrollFactor(0).setDepth(20);
-
     this.controlsText = this.add.text(viewWidth - 42, 34, 'WASD move | Space jump | Enter attack', {
       fontFamily: 'Arial',
       fontSize: '18px',
       color: '#cbd5e1',
       align: 'right'
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(20);
-
-    this.updateHud();
   }
 
   updateHud() {
-    if (!this.character || !this.hpText || !this.attackText) {
-      return;
+    if (this.character) {
+      this.character.syncHpText();
     }
-
-    const cooldownLeft = Math.max(0, this.character.attackCooldownMs - (this.time.now - this.character.lastAttackAt));
-    const attackState = this.character.isAttacking()
-      ? 'ATTACK'
-      : cooldownLeft > 0
-        ? `CD ${Math.ceil(cooldownLeft)}ms`
-        : 'READY';
-
-    this.hpText.setText(`HP: ${this.character.getHp()} / ${this.character.getMaxHp()}`);
-    this.attackText.setText(`ATK: ${this.character.getAttackDamage()} | ${attackState}`);
   }
 
   createDebugZoomControls(viewWidth) {
