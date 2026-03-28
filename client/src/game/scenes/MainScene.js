@@ -387,6 +387,8 @@ export class MainScene extends Phaser.Scene {
       return;
     }
 
+    if (!this.character) return;
+
     const attackId = this.character.getAttackId();
     const isPlayerAttacking = this.character.isAttacking();
     const playerAttackBounds = isPlayerAttacking ? this.character.getAttackHitbox().getBounds() : null;
