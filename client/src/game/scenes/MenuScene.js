@@ -77,7 +77,9 @@ export class MenuScene extends Phaser.Scene {
       let idRoom = prompt("enter id room");
       let passRoom = prompt("enter room pass");
       unit_manager.socket.emit("join_room", { sid: localStorage.getItem('game_session_id'), idRoom, passRoom});
-
+      unit_manager.socket.once('joined_room_success', (data) => {
+        this.scene.start('MainScene');
+      });
     });
 
     this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {

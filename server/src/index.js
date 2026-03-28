@@ -113,9 +113,9 @@ io.on('connection', (socket) => {
     });
 
     // Синхронизация мира
-    socket.emit('currentPlayers', activePlayers);
+   // socket.emit('currentPlayers', activePlayers);
     socket.emit('currentEnemies', enemies);
-    socket.broadcast.emit('newPlayer', player);
+    //socket.broadcast.emit('newPlayer', player);
   });
 
   // Все остальные события используют activePlayers[socket.id]
@@ -128,23 +128,113 @@ io.on('connection', (socket) => {
         lifespan: -1
       },
       created: sid,
-      password: roomPass
+      password: roomPass,
+      enemies: JSON.parse(JSON.stringify(enemies)) // Сразу даем комнате своих врагов
     });
 
     let list_rooms = rooms.map(obj => obj.info);
     socket.emit('update_list_rooms', { list_rooms });
   });
 
-  // Все остальные события используют activePlayers[socket.id]
+  socket.on('join_room', (data) => {
+    const { sid, idRoom, passRoom } = data;
+    const player = sessionDatabase[sid];
+
+    // Ищем комнату в массиве по ID (приводим к числу, если нужно)
+    const roomIndex = rooms.findIndex(r => r.info.id == idRoom);
+    const room = rooms[roomIndex];
+
+    if (!room) {
+      return socket.emit('error_msg', 'Комната не найдена');
+    }
+
+    // Проверяем пароль
+    if (room.password !== "" && room.password !== passRoom) {
+      return socket.emit('error_msg', 'Неверный пароль');
+    }
+
+    if (player) {
+      // 1. Уходим из предыдущей комнаты, если она была
+      if (player.roomId) {
+        socket.leave(player.roomId);
+      }
+
+      // 2. Привязываем игрока к новой комнате
+      player.roomId = idRoom;
+      socket.join(idRoom);
+
+      // 3. Если в этой комнате еще нет своих врагов — создаем их (копируем дефолтных)
+      if (!room.enemies) {
+        room.enemies = JSON.parse(JSON.stringify(enemies));
+      }
+
+      console.log(`Игрок ${player.username} зашел в комнату ${idRoom}`);
+
+      // 4. Сообщаем клиенту, что вход успешен
+      socket.emit('joined_room_success', { roomId: idRoom });
+
+      // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
+      const playersInRoom = {};
+      Object.values(activePlayers).forEach(p => {
+        if (p.roomId == idRoom) playersInRoom[p.id] = p;
+      });
+
+      socket.emit('currentPlayers', playersInRoom);
+      socket.emit('currentEnemies', room.enemies);
+
+      // Оповещаем остальных ВНУТРИ комнаты
+      socket.to(idRoom).emit('newPlayer', player);
+    }
+  });
+
+
   socket.on('playerMovement', (movementData) => {
     const player = activePlayers[socket.id];
-    if (!player) return;
+    if (!player || !player.roomId) return;
 
     player.x = movementData.x;
     player.y = movementData.y;
     if (typeof movementData.hp === 'number') player.hp = movementData.hp;
 
-    socket.broadcast.emit('playerMoved', player);
+    // Отправляем только людям в той же комнате
+    socket.to(player.roomId).emit('playerMoved', player);
+  });
+
+  socket.on('playerAttack', (data) => {
+    const player = activePlayers[socket.id];
+    if (player && player.roomId) {
+      // Отправляем всем в комнату, включая себя (или socket.to если себе не надо)
+      io.to(player.roomId).emit('playerAttacked', { attackerId: socket.id, ...data });
+    }
+  });
+
+  socket.on('playerHit', (data) => {
+    const player = activePlayers[socket.id];
+    const target = activePlayers[data.targetId];
+    if (target && player && player.roomId) {
+      target.hp = Math.max(0, target.hp - data.damage);
+      // Рассылка только в текущую комнату
+      io.to(player.roomId).emit('hpUpdate', { id: data.targetId, hp: target.hp, attackerId: socket.id, damage: data.damage });
+    }
+  });
+
+  socket.on('enemyHit', (data) => {
+    const player = activePlayers[socket.id];
+    if (!player || !player.roomId) return;
+
+    // Ищем врага именно в этой комнате
+    const room = rooms.find(r => r.info.id === player.roomId);
+    if (room && room.enemies && room.enemies[data.enemyId]) {
+      const enemy = room.enemies[data.enemyId];
+      enemy.hp = Math.max(0, enemy.hp - data.damage);
+
+      io.to(player.roomId).emit('enemyHpUpdate', {
+        id: data.enemyId,
+        hp: enemy.hp,
+        attackerId: socket.id,
+        damage: data.damage
+      });
+    }
   });
 
   socket.on('disconnect', () => {
@@ -155,25 +245,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Обработка ударов и урона (без изменений)
-  socket.on('playerAttack', (data) => {
-    if (activePlayers[socket.id]) io.emit('playerAttacked', { attackerId: socket.id, ...data });
-  });
-
-  socket.on('playerHit', (data) => {
-    const target = activePlayers[data.targetId];
-    if (target) {
-      target.hp = Math.max(0, target.hp - data.damage);
-      io.emit('hpUpdate', { id: data.targetId, hp: target.hp, attackerId: socket.id, damage: data.damage });
-    }
-  });
-
-  socket.on('enemyHit', (data) => {
-    if (enemies[data.enemyId]) {
-      enemies[data.enemyId].hp = Math.max(0, enemies[data.enemyId].hp - data.damage);
-      io.emit('enemyHpUpdate', { id: data.enemyId, hp: enemies[data.enemyId].hp, attackerId: socket.id, damage: data.damage });
-    }
-  });
 });
 
 //#endregion

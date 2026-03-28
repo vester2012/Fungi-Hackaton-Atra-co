@@ -176,4 +176,8 @@ socket.on('update_list_rooms', (data) => {
     unit_manager.rooms = data.list_rooms;
 });
 
+socket.on('error_msg', (data) => {
+    alert(data);
+});
+
 unit_manager.socket = socket;

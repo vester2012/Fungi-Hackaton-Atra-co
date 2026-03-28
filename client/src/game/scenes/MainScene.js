@@ -19,6 +19,7 @@ const ENEMY_SPAWNS = [
 export class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
+    console.log(unit_manager.info.players);
   }
 
   create() {
