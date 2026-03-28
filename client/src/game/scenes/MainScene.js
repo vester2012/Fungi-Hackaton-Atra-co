@@ -1,5 +1,6 @@
 import { Character } from '../entities/Character.js';
 import { Platform } from '../entities/Platform.js';
+import {unit_manager} from "../unit_manager";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -61,6 +62,24 @@ export class MainScene extends Phaser.Scene {
   update() {
     if (this.character) {
       this.character.update();
+    }
+    this.updateSocketInfo();
+  }
+
+  updateSocketInfo() {
+    let players = unit_manager.info.players;
+    let str = '';
+
+    // Перебор entries
+    for (const [key, value] of Object.entries(players)) {
+      str += `id:${players[key].id}   hp:${players[key].hp} (${players[key].x}:${players[key].y})` + '\n'
+    }
+
+    if (this.textInfo) {
+      this.textInfo.setText("info socket:" + "\n" + str)
+
+    } else {
+      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'Arial', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
     }
   }
 
