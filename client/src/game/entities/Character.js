@@ -6,25 +6,30 @@ export class Character extends Phaser.Physics.Arcade.Sprite {
 
     super(scene, x, y, Character.TEXTURE_KEY);
 
+    this.scene = scene;
+
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    this.setOrigin(0.5, 1);
+    this.setOrigin(0.5, 0.5);
     this.setCollideWorldBounds(true);
-    this.setBounce(0, 0);
-    this.setDragX(1600);
-    this.setMaxVelocity(420, 1200);
-    this.setSize(42, 88);
-    this.setOffset(11, 8);
+    this.setDrag(1200, 1200);
+    this.setMaxVelocity(220, 220);
+    this.setSize(28, 28);
+    this.setDepth(5);
 
-    this.moveSpeed = 320;
-    this.jumpSpeed = 760;
-    this.cursors = scene.input.keyboard.addKeys({
+    this.moveSpeed = 180;
+
+    this.keys = scene.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
       down: Phaser.Input.Keyboard.KeyCodes.S,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
-      space: Phaser.Input.Keyboard.KeyCodes.SPACE
+      interact: Phaser.Input.Keyboard.KeyCodes.E,
+      meow: Phaser.Input.Keyboard.KeyCodes.Q,
+      action1: Phaser.Input.Keyboard.KeyCodes.ONE,
+      action2: Phaser.Input.Keyboard.KeyCodes.TWO,
+      action3: Phaser.Input.Keyboard.KeyCodes.THREE
     });
   }
 
@@ -33,43 +38,64 @@ export class Character extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
 
-    graphics.fillStyle(0xff8a65, 1);
-    graphics.fillRoundedRect(10, 8, 44, 76, 16);
+    g.fillStyle(0xff8a65, 1);
+    g.fillRoundedRect(4, 6, 24, 22, 8);
 
-    graphics.fillStyle(0xffcc80, 1);
-    graphics.fillCircle(32, 20, 12);
+    g.fillStyle(0xffab91, 1);
+    g.fillTriangle(7, 8, 11, 0, 15, 8);
+    g.fillTriangle(17, 8, 21, 0, 25, 8);
 
-    graphics.fillStyle(0x263238, 0.9);
-    graphics.fillRect(18, 36, 8, 22);
-    graphics.fillRect(38, 36, 8, 22);
-    graphics.fillRect(20, 84, 8, 18);
-    graphics.fillRect(36, 84, 8, 18);
+    g.fillStyle(0x263238, 1);
+    g.fillCircle(11, 17, 2);
+    g.fillCircle(21, 17, 2);
 
-    graphics.generateTexture(Character.TEXTURE_KEY, 64, 110);
-    graphics.destroy();
+    g.generateTexture(Character.TEXTURE_KEY, 32, 32);
+    g.destroy();
   }
 
   update() {
-    const leftPressed = this.cursors.left.isDown;
-    const rightPressed = this.cursors.right.isDown;
-    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);
+    let vx = 0;
+    let vy = 0;
 
-    if (leftPressed && !rightPressed) {
-      this.setVelocityX(-this.moveSpeed);
-      this.setFlipX(true);
-    } else if (rightPressed && !leftPressed) {
-      this.setVelocityX(this.moveSpeed);
-      this.setFlipX(false);
-    } else {
-      this.setVelocityX(0);
+    if (!this.scene.catState.isBusy()) {
+      if (this.keys.left.isDown) vx -= this.moveSpeed;
+      if (this.keys.right.isDown) vx += this.moveSpeed;
+      if (this.keys.up.isDown) vy -= this.moveSpeed;
+      if (this.keys.down.isDown) vy += this.moveSpeed;
     }
 
-    if (jumpPressed && this.body.blocked.down) {
-      this.setVelocityY(-this.jumpSpeed);
+    if (vx !== 0 && vy !== 0) {
+      vx *= 0.7071;
+      vy *= 0.7071;
+    }
+
+    this.setVelocity(vx, vy);
+
+    if (vx < 0) this.setFlipX(true);
+    if (vx > 0) this.setFlipX(false);
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.meow)) {
+      this.scene.onMeow(this.x, this.y);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+      this.scene.interactionSystem.startPrimaryAction();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action1)) {
+      this.scene.interactionSystem.startActionByIndex(0);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action2)) {
+      this.scene.interactionSystem.startActionByIndex(1);
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action3)) {
+      this.scene.interactionSystem.startActionByIndex(2);
     }
   }
 }
 
-Character.TEXTURE_KEY = 'character-prototype';
+Character.TEXTURE_KEY = 'cat-topdown-prototype';
