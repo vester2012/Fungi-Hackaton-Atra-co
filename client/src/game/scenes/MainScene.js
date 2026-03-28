@@ -504,7 +504,7 @@ export class MainScene extends Phaser.Scene {
     const target = this.character.getPhysicsTarget();
 
     const x = Phaser.Math.Between(100, this.worldWidth - 100);
-    const y = Phaser.Math.Between(100, this.worldHeight - 100);
+    const y = Phaser.Math.Between(100, this.worldHeight - 600);
 
     // телепорт
     this.tweens.add({
