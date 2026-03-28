@@ -2,7 +2,7 @@ const Phaser = window.Phaser;
 import {unit_manager} from "../unit_manager.js";
 
 export class Character extends Phaser.GameObjects.Container {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, options = {}) {
     super(scene, x, y);
 
     scene.add.existing(this);
@@ -37,6 +37,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.facingDirection = 1;
     this.lastExternalX = x;
     this.isSyncingFromHitbox = false;
+    this.showStats = options.showStats ?? true;
     this.currentAnimation = 'idle';
     this.lastDownTapAt = 0;
     this.dropThroughUntil = 0;
@@ -51,13 +52,36 @@ export class Character extends Phaser.GameObjects.Container {
       enter: Phaser.Input.Keyboard.KeyCodes.ENTER
     });
 
-    this.add(this.anim = scene.add.spine(0, 0, 'person_SPO', 'idle', true));
+    this.anim = scene.add.spine(0, 0, 'person_SPO', 'idle', true);
     this.anim.setScale(0.15);
     this.anim.setMix('run', 'idle', 0.25);
 
-    this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2)
-      .setStrokeStyle(2, 0xfb923c, 0.95)
-      .setVisible(false);
+    this.add(this.anim);
+
+    if (this.showStats) {
+      this.hpText = scene.add.text(0, -150, '', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        color: '#e2e8f0',
+        stroke: '#0f172a',
+        strokeThickness: 4
+      }).setOrigin(0.5, 1);
+
+      this.attackInfoText = scene.add.text(0, -130, '', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#fdba74',
+        stroke: '#431407',
+        strokeThickness: 4
+      }).setOrigin(0.5, 1);
+
+      this.add(this.hpText);
+      this.add(this.attackInfoText);
+    }
+
+    this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
+
+    this.syncHpText();
   }
 
   update() {
@@ -146,12 +170,22 @@ export class Character extends Phaser.GameObjects.Container {
 
   syncContainerToHitbox() {
     this.isSyncingFromHitbox = true;
-    super.setPosition(
-      Math.round(this.hitbox.x),
-      Math.round(this.hitbox.y + this.hitbox.height * 0.5)
-    );
+    super.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
     this.isSyncingFromHitbox = false;
+    this.syncHpText();
     this.syncAttackHitbox();
+  }
+
+  syncHpText() {
+    if (!this.showStats || !this.hpText || !this.attackInfoText || !this.hitbox) {
+      return;
+    }
+
+    const cooldownLeft = Math.max(0, this.attackCooldownMs - (this.scene.time.now - this.lastAttackAt));
+    const attackState = this.isAttacking() ? 'ATTACK' : cooldownLeft > 0 ? `CD ${Math.ceil(cooldownLeft)}ms` : 'READY';
+
+    this.hpText.setText(`HP ${this.hp}/${this.maxHp}`);
+    this.attackInfoText.setText(`ATK ${this.baseDamage} | ${attackState}`);
   }
 
   syncAttackHitbox() {
@@ -275,11 +309,13 @@ export class Character extends Phaser.GameObjects.Container {
 
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
+    this.syncHpText();
     return this.hp;
   }
 
   heal(amount) {
     this.hp = Math.min(this.maxHp, this.hp + amount);
+    this.syncHpText();
     return this.hp;
   }
 
@@ -311,6 +347,16 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
+    if (this.attackInfoText) {
+      this.attackInfoText.destroy();
+      this.attackInfoText = null;
+    }
+
+    if (this.hpText) {
+      this.hpText.destroy();
+      this.hpText = null;
+    }
+
     if (this.attackHitbox) {
       this.attackHitbox.destroy();
       this.attackHitbox = null;
