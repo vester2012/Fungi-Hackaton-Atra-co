@@ -61,6 +61,10 @@ async function startGame() {
 
 startGame();
 
+
+
+
+
 //* SOCKET *//
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -69,7 +73,32 @@ const socket = io(SOCKET_URL, {
 });
 let players = unit_manager.info.players;
 
+
+
 socket.on('connect', () => { unit_manager.my_id = socket.id; });
+
+// Логика на клиенте (Phaser / JS)
+const savedSession = localStorage.getItem('game_session_id');
+const savedName = localStorage.getItem('game_username');
+
+if (!savedSession) {
+    const name = prompt("Введите ник для регистрации:");
+    localStorage.setItem('game_username', name);
+    // Отправляем пустую сессию и ник
+    socket.emit('login', { sessionId: null, username: name });
+} else {
+    // Отправляем старую сессию (ник сервер возьмет из базы)
+    socket.emit('login', { sessionId: savedSession });
+}
+
+// Когда сервер подтвердил логин
+socket.on('loginSuccess', (data) => {
+    // Сохраняем ID сессии на будущее
+    localStorage.setItem('game_session_id', data.sessionId);
+    console.log(`Залогинены как ${data.username}`);
+
+    // ТУТ инициализируем вашего игрока в Phaser
+});
 
 // Получаем список всех игроков при входе
 socket.on('currentPlayers', (serverPlayers) => {
