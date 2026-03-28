@@ -3,6 +3,8 @@ import { Enemy } from '../entities/Enemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
+import {WallSlideZone} from "../systems/WallSlideZone";
+import {ZoneManager} from "../systems/ZoneManager";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -28,8 +30,12 @@ export class MainScene extends Phaser.Scene {
     this.drawBackground(worldWidth, worldHeight);
     this.drawMap(worldWidth, worldHeight);
     this.createCollisionMap(worldWidth, worldHeight);
+    this.zoneManager = new ZoneManager(this);
+    this.createZones(worldWidth, worldHeight);
     this.createCharacter();
+    this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();
+    this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
     this.createHud(viewWidth);
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
@@ -65,6 +71,31 @@ export class MainScene extends Phaser.Scene {
     this.createDebugZoomControls(viewWidth);
   }
 
+
+  createZones(width, height) {
+    const s = WORLD_SCALE;
+    const isDebug = true; // Включи для предпросмотра (зоны будут розовыми)
+
+    // Пример: добавляем зону скольжения на правую стену прямоугольника (185x 857y)
+    // Параметры Rectangle: x (центр), y (центр), width, height
+    // Указываем direction: -1 (персонаж прилипнет, если нажмет влево)
+    this.zoneManager.addZone(
+        new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, {
+          direction: -1,
+          debug: isDebug
+        })
+    );
+
+    // Добавляем зону скольжения на левую стену (direction: 1)
+    this.zoneManager.addZone(
+        new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, {
+          direction: 1,
+          debug: isDebug
+        })
+    );
+
+    // И так далее. Теперь ты можешь навешивать WallSlideZone поверх любых стен!
+  }
   update() {
     if (this.character) {
       this.character.update();
