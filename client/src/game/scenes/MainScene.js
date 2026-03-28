@@ -1,4 +1,5 @@
 import { Character } from '../entities/Character.js';
+import { Enemy } from '../entities/Enemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
 
@@ -11,6 +12,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
+    this.isReturningToMenu = false;
+
     const viewWidth = this.scale.width;
     const viewHeight = this.scale.height;
     const worldWidth = viewWidth * WORLD_SCALE;
@@ -25,6 +28,7 @@ export class MainScene extends Phaser.Scene {
     this.drawMap(worldWidth, worldHeight);
     this.createCollisionMap(worldWidth, worldHeight);
     this.createCharacter();
+    this.createEnemiesBot();
     this.createHud(viewWidth);
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
@@ -69,8 +73,28 @@ export class MainScene extends Phaser.Scene {
       unit_manager.socket.emit('playerMovement', {x, y});
 
     }
+
+    this.handleCharacterDeath();
+    this.updateEnemiesBot();
     this.updateHud();
     this.updateSocketInfo();
+    this.updateEnemys();
+
+  }
+
+  updateEnemys() {
+    let players = unit_manager.info.players;
+    for (const [key, value] of Object.entries(players)) {
+      if(value.id !== unit_manager.my_id) {
+        if (!value.obj) value.obj = this.createEnemy();
+        value.obj.applyRemoteState(value.x, value.y, this.time.now);
+
+        if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
+          value.lastPlayedAttackId = value.pendingAttackId;
+          value.obj.playRemoteAttack(this.time.now);
+        }
+      }
+    }
   }
 
   updateSocketInfo() {
@@ -210,6 +234,78 @@ export class MainScene extends Phaser.Scene {
       undefined,
       (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
     );
+  }
+
+  createEnemiesBot() {
+    this.enemiesBot = [
+      new Enemy(this, 360 * WORLD_SCALE, 650 * WORLD_SCALE),
+      new Enemy(this, 1120 * WORLD_SCALE, 580 * WORLD_SCALE),
+      new Enemy(this, 1540 * WORLD_SCALE, 250 * WORLD_SCALE)
+    ];
+
+    this.enemiesBot.forEach((enemy) => {
+      enemy.setDepth(2);
+      this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
+    });
+  }
+
+  updateEnemiesBot() {
+    if (!this.enemiesBot?.length || !this.character) {
+      return;
+    }
+
+    const attackId = this.character.getAttackId();
+    const isPlayerAttacking = this.character.isAttacking();
+    const playerAttackBounds = isPlayerAttacking ? this.character.getAttackHitbox().getBounds() : null;
+
+    this.enemiesBot.forEach((enemy) => {
+      enemy.update(this.character);
+
+      if (enemy.isDead()) {
+        return;
+      }
+
+      if (!isPlayerAttacking || attackId === 0) {
+        return;
+      }
+
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerAttackBounds, enemy.getPhysicsTarget().getBounds())) {
+        enemy.takeDamage(this.character.getAttackDamage(), attackId);
+      }
+    });
+
+    this.enemiesBot = this.enemiesBot.filter((enemy) => {
+      if (!enemy.isDead()) {
+        return true;
+      }
+
+      enemy.destroy();
+      return false;
+    });
+  }
+
+  handleCharacterDeath() {
+    if (!this.character || this.isReturningToMenu || !this.character.isDead()) {
+      return;
+    }
+
+    this.isReturningToMenu = true;
+    this.cameras.main.stopFollow();
+    this.character.destroy();
+    this.character = null;
+    this.scene.start('MenuScene');
+  }
+
+  createEnemy() {
+    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE);
+    enemy.setDepth(1);
+    this.physics.add.collider(
+        enemy.getPhysicsTarget(),
+        this.platforms,
+        undefined,
+        (_characterBody, platform) => enemy.shouldCollideWithPlatform(platform)
+    );
+    return enemy;
   }
 
   createHud(viewWidth) {

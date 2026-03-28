@@ -1,4 +1,5 @@
 const Phaser = window.Phaser;
+import {unit_manager} from "../unit_manager.js";
 
 export class Character extends Phaser.GameObjects.Container {
   constructor(scene, x, y) {
@@ -6,7 +7,8 @@ export class Character extends Phaser.GameObjects.Container {
 
     scene.add.existing(this);
 
-    this.hitbox = scene.add.rectangle(x, y - 44, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
+    this.hitboxOffsetY = -44;
+    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
 
     scene.physics.add.existing(this.hitbox);
 
@@ -31,7 +33,10 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackHeight = 80;
     this.lastAttackAt = -this.attackCooldownMs;
     this.attackUntil = 0;
+    this.attackId = 0;
     this.facingDirection = 1;
+    this.lastExternalX = x;
+    this.isSyncingFromHitbox = false;
     this.currentAnimation = 'idle';
     this.lastDownTapAt = 0;
     this.dropThroughUntil = 0;
@@ -80,12 +85,10 @@ export class Character extends Phaser.GameObjects.Container {
 
     if (leftPressed && !rightPressed) {
       this.hitbox.body.setVelocityX(-this.moveSpeed);
-      this.facingDirection = -1;
-      this.anim.scaleX = -Math.abs(this.anim.scaleX);
+      this.applyFacingDirection(-1);
     } else if (rightPressed && !leftPressed) {
       this.hitbox.body.setVelocityX(this.moveSpeed);
-      this.facingDirection = 1;
-      this.anim.scaleX = Math.abs(this.anim.scaleX);
+      this.applyFacingDirection(1);
     } else {
       this.hitbox.body.setVelocityX(0);
     }
@@ -96,20 +99,15 @@ export class Character extends Phaser.GameObjects.Container {
     }
 
     if (attackPressed) {
-      this.tryAttack(now);
-      this.anim.off('complete');
-
-      this.anim.play('hit_low');
-
-      this.anim.on('complete', () => {
-        this.anim.off('complete');
-        this.anim.play('idle', true);
-      });
+      if (this.tryAttack(now)) {
+        this.playAttackAnimation();
+      }
     }
 
-    this.syncAttackHitbox();
-    this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
-    this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
+    if (!this.isAttacking()) {
+      this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
+    }
+    this.syncContainerToHitbox();
   }
   //
   // isMoving() {
@@ -146,6 +144,16 @@ export class Character extends Phaser.GameObjects.Container {
     });
   }
 
+  syncContainerToHitbox() {
+    this.isSyncingFromHitbox = true;
+    super.setPosition(
+      Math.round(this.hitbox.x),
+      Math.round(this.hitbox.y + this.hitbox.height * 0.5)
+    );
+    this.isSyncingFromHitbox = false;
+    this.syncAttackHitbox();
+  }
+
   syncAttackHitbox() {
     const isActive = this.isAttacking();
     const directionOffset = (this.hitbox.width * 0.5 + this.attackWidth * 0.5) * this.facingDirection;
@@ -157,6 +165,33 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackHitbox.setVisible(isActive);
   }
 
+  applyFacingDirection(direction) {
+    if (!direction || direction === this.facingDirection) {
+      return;
+    }
+
+    this.facingDirection = direction;
+    this.anim.scaleX = direction < 0 ? -Math.abs(this.anim.scaleX) : Math.abs(this.anim.scaleX);
+  }
+
+  setPosition(x, y, z, w) {
+    super.setPosition(x, y, z, w);
+
+    if (this.isSyncingFromHitbox || !this.hitbox?.body) {
+      return this;
+    }
+
+    const deltaX = x - this.lastExternalX;
+    if (deltaX !== 0) {
+      this.applyFacingDirection(deltaX < 0 ? -1 : 1);
+    }
+    this.lastExternalX = x;
+
+    this.hitbox.body.reset(x, y + this.hitboxOffsetY);
+    this.syncAttackHitbox();
+    return this;
+  }
+
   tryAttack(now = this.scene.time.now) {
     if (now - this.lastAttackAt < this.attackCooldownMs) {
       return false;
@@ -164,8 +199,50 @@ export class Character extends Phaser.GameObjects.Container {
 
     this.lastAttackAt = now;
     this.attackUntil = now + this.attackDurationMs;
+    this.attackId += 1;
     this.syncAttackHitbox();
+
+    if (unit_manager.socket) {
+      unit_manager.socket.emit('playerAttack', { attackId: this.attackId });
+    }
+
     return true;
+  }
+
+  playAttackAnimation() {
+    this.anim.off('complete');
+    this.anim.play('hit_low');
+    this.anim.on('complete', () => {
+      this.anim.off('complete');
+      this.anim.play('idle', true);
+    });
+  }
+
+  playRemoteAttack(now = this.scene.time.now) {
+    this.lastAttackAt = now;
+    this.attackUntil = now + this.attackDurationMs;
+    this.syncAttackHitbox();
+    this.playAttackAnimation();
+  }
+
+  applyRemoteState(x, y, now = this.scene.time.now) {
+    const previousX = this.x;
+    const previousY = this.y;
+    const movedX = x - previousX;
+    const movedY = y - previousY;
+    const isMoving = Math.abs(movedX) > 1 || Math.abs(movedY) > 1;
+
+    this.setPosition(x, y);
+
+    if (movedX !== 0) {
+      this.applyFacingDirection(movedX < 0 ? -1 : 1);
+    }
+
+    if (!this.isAttacking()) {
+      this.setAnimation(isMoving ? 'run' : 'idle', true);
+    }
+
+    this.syncAttackHitbox();
   }
 
   isAttacking() {
@@ -180,12 +257,20 @@ export class Character extends Phaser.GameObjects.Container {
     return this.attackHitbox;
   }
 
+  getAttackId() {
+    return this.attackId;
+  }
+
   getHp() {
     return this.hp;
   }
 
   getMaxHp() {
     return this.maxHp;
+  }
+
+  isDead() {
+    return this.hp <= 0;
   }
 
   takeDamage(amount) {

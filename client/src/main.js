@@ -32,6 +32,12 @@ socket.on('playerMoved', (playerInfo) => {
     }
 });
 
+socket.on('playerAttacked', (attackInfo) => {
+    if (players[attackInfo.attackerId]) {
+        players[attackInfo.attackerId].pendingAttackId = attackInfo.attackId;
+    }
+});
+
 // Удаление вышедшего игрока
 socket.on('playerDisconnected', (playerId) => {
     delete players[playerId];
