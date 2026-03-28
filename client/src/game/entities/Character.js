@@ -158,7 +158,7 @@ export class Character extends Phaser.GameObjects.Container {
 
     if (attackPressed) {
       if (this.tryAttack(now)) {
-        this.playAttackAnimation();
+        this.playAttackAnimation(movingHorizontally && isGrounded);
       }
     }
 
@@ -256,12 +256,12 @@ export class Character extends Phaser.GameObjects.Container {
     return true;
   }
 
-  playAttackAnimation() {
+  playAttackAnimation(isRunningAttack = false) {
     this.anim.off('complete');
-    this.anim.play('attack_1');
+    this.anim.play(isRunningAttack ? 'run_and_attack' : 'attack_1');
     this.anim.on('complete', () => {
       this.anim.off('complete');
-      this.anim.play('idle', true);
+      this.currentAnimation = '';
     });
   }
 
