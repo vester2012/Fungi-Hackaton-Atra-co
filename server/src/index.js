@@ -9,6 +9,17 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 const PATH_PUBLIC = path.resolve(__dirname, '../../client/dist');
+const SPAWN_POINTS = [
+  { x: 220, y: 650 },
+  { x: 315, y: 650 },
+  { x: 540, y: 560 },
+  { x: 785, y: 485 },
+  { x: 1050, y: 410 },
+  { x: 1325, y: 340 },
+  { x: 1590, y: 280 },
+  { x: 1130, y: 680 },
+  { x: 1450, y: 570 }
+];
 app.use(express.static(PATH_PUBLIC));
 
 // Хранилища
@@ -20,6 +31,11 @@ const enemies = {
   'enemy-3': { id: 'enemy-3', hp: 100 }
 };
 
+function getRandomSpawnPoint() {
+  const index = Math.floor(Math.random() * SPAWN_POINTS.length);
+  return { ...SPAWN_POINTS[index] };
+}
+
 const io = new Server(server, {
   cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
 });
@@ -29,6 +45,8 @@ io.on('connection', (socket) => {
   socket.on('login', (data) => {
     let sessionId = data.sessionId;
     let player;
+
+    const spawnPoint = getRandomSpawnPoint();
 
     // 1. Проверяем, существует ли сессия
     if (sessionId && sessionDatabase[sessionId]) {
@@ -40,8 +58,6 @@ io.on('connection', (socket) => {
       player = {
         sessionId: sessionId,
         username: data.username || `Guest_${socket.id.substring(0, 4)}`,
-        x: 100,
-        y: 100,
         hp: 100,
         color: '#' + Math.floor(Math.random()*16777215).toString(16),
         score: 0
@@ -49,6 +65,9 @@ io.on('connection', (socket) => {
       sessionDatabase[sessionId] = player;
       console.log(`Новый игрок создан: ${player.username}`);
     }
+
+    player.x = spawnPoint.x;
+    player.y = spawnPoint.y;
 
     // Привязываем актуальный socket.id к объекту игрока
     player.id = socket.id;

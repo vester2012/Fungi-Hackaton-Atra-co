@@ -122,7 +122,6 @@ export class MainScene extends Phaser.Scene {
         y,
         hp: this.character.getHp()
       });
-
     }
 
     this.handleCharacterDeath();
@@ -331,16 +330,14 @@ export class MainScene extends Phaser.Scene {
   }
 
   createCharacter() {
-    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, {
-      showStats: true,
-      nickname: 'Player'
-    });
     const playerState = unit_manager.info.players[unit_manager.my_id] || {
       id: unit_manager.my_id
     };
+    this.character = new Character(this, playerState.x, playerState.y, {
+      showStats: true,
+      nickname: playerState.username || 'Player'
+    });
     playerState.obj = this.character;
-    playerState.x = this.character.x;
-    playerState.y = this.character.y;
     playerState.hp = this.character.getHp();
     unit_manager.info.players[unit_manager.my_id] = playerState;
 
