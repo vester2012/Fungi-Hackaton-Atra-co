@@ -187,6 +187,27 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('playerDied', () => {
+    const player = activePlayers[socket.id];
+    if (!player) return;
+
+    console.log(`Игрок ${player.username} погиб и удален из активных`);
+
+    const roomId = player.roomId;
+
+    // 1. Удаляем игрока из списка активных на сервере,
+    // чтобы он не участвовал в рассылках позиций
+    delete activePlayers[socket.id];
+
+    // 2. Оповещаем комнату, что этот объект игрока нужно уничтожить
+    // Мы используем существующее событие 'playerDisconnected',
+    // так как клиент уже умеет удалять спрайт по этому событию.
+    if (roomId) {
+      io.to(roomId).emit('playerDisconnected', socket.id);
+    } else {
+      io.emit('playerDisconnected', socket.id);
+    }
+  });
 
   socket.on('playerMovement', (movementData) => {
     const player = activePlayers[socket.id];
@@ -222,7 +243,6 @@ io.on('connection', (socket) => {
     const player = activePlayers[socket.id];
     if (!player || !player.roomId) return;
 
-    // Ищем врага именно в этой комнате
     const room = rooms.find(r => r.info.id === player.roomId);
     if (room && room.enemies && room.enemies[data.enemyId]) {
       const enemy = room.enemies[data.enemyId];
@@ -230,18 +250,29 @@ io.on('connection', (socket) => {
 
       io.to(player.roomId).emit('enemyHpUpdate', {
         id: data.enemyId,
-        hp: enemy.hp,
-        attackerId: socket.id,
-        damage: data.damage
+        hp: enemy.hp
       });
+
+      // Если враг умер — сообщаем об этом
+      if (enemy.hp <= 0) {
+        io.to(player.roomId).emit('enemyDied', { id: data.enemyId });
+        // Можно удалить его из списка комнаты или запустить таймер респауна
+      }
     }
   });
 
   socket.on('disconnect', () => {
-    if (activePlayers[socket.id]) {
-      console.log(`Игрок ${activePlayers[socket.id].username} отключился`);
-      delete activePlayers[socket.id]; // Удаляем только из активных
-      io.emit('playerDisconnected', socket.id);
+    const player = activePlayers[socket.id];
+    if (player) {
+      console.log(`Игрок ${player.username} отключился`);
+      const roomId = player.roomId;
+      delete activePlayers[socket.id];
+
+      if (roomId) {
+        io.to(roomId).emit('playerDisconnected', socket.id);
+      } else {
+        io.emit('playerDisconnected', socket.id);
+      }
     }
   });
 

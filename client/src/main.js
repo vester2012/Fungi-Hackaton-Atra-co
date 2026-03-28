@@ -97,7 +97,12 @@ socket.on('loginSuccess', (data) => {
 
     // ТУТ инициализируем вашего игрока в Phaser
 });
-
+socket.on('enemyDied', (data) => {
+    const enemyEntry = unit_manager.info.enemies[data.id];
+    if (enemyEntry && enemyEntry.obj) {
+        enemyEntry.obj.destroy(); // Враг исчезнет у всех в комнате
+    }
+});
 // Получаем список всех игроков при входе
 socket.on('currentPlayers', (serverPlayers) => {
     Object.assign(players, serverPlayers);
@@ -141,34 +146,20 @@ socket.on('playerDisconnected', (playerId) => {
 });
 
 socket.on('hpUpdate', (data) => {
-    if (players[data.id]) {
-        const previousHp = typeof players[data.id].hp === 'number' ? players[data.id].hp : null;
-        players[data.id].hp = data.hp;
-        if (players[data.id].obj) {
-            const playerObject = players[data.id].obj;
-            const tookDamage = typeof data.damage === 'number'
-                && previousHp !== null
-                && data.hp < previousHp
-                && data.id !== unit_manager.my_id;
-
-            if (tookDamage && playerObject.applySyncedDamage) {
-                playerObject.applySyncedDamage(data.damage, data.hp);
-            } else if (playerObject.setHp) {
-                playerObject.setHp(data.hp);
-            }
-        }
+    const playerEntry = players[data.id];
+    // Проверяем: есть ли запись, есть ли объект и не уничтожен ли он в Phaser
+    if (playerEntry && playerEntry.obj && playerEntry.obj.active) {
+        playerEntry.hp = data.hp;
+        playerEntry.obj.setHp(data.hp);
     }
 });
 
 socket.on('enemyHpUpdate', (data) => {
-    if (!unit_manager.info.enemies[data.id]) {
-        unit_manager.info.enemies[data.id] = { id: data.id, hp: data.hp };
-    } else {
-        unit_manager.info.enemies[data.id].hp = data.hp;
-    }
-
-    if (unit_manager.info.enemies[data.id].obj?.setHp) {
-        unit_manager.info.enemies[data.id].obj.setHp(data.hp);
+    const enemyEntry = unit_manager.info.enemies[data.id];
+    // Аналогичная проверка для врагов
+    if (enemyEntry && enemyEntry.obj && enemyEntry.obj.active) {
+        enemyEntry.hp = data.hp;
+        enemyEntry.obj.setHp(data.hp);
     }
 });
 //unit_manager.socket.emit("create_room", { sid: localStorage.getItem('game_session_id'), roomName, roomPass});

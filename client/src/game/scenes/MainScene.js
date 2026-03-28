@@ -427,18 +427,16 @@ export class MainScene extends Phaser.Scene {
 
   createEnemiesBot() {
     this.enemiesBot = this.enemySpawns.map((spawn) => {
-      const enemyState = unit_manager.info.enemies[spawn.id];
-      const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
+        const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
 
-      if (typeof enemyState?.hp === 'number') enemy.setHp(enemyState.hp);
+        // ВАЖНО: Привязываем живой объект в unit_manager, чтобы main.js его видел
+        if (!unit_manager.info.enemies[spawn.id]) {
+            unit_manager.info.enemies[spawn.id] = {};
+        }
+        unit_manager.info.enemies[spawn.id].obj = enemy;
+        unit_manager.info.enemies[spawn.id].id = spawn.id;
 
-      unit_manager.info.enemies[spawn.id] = {
-        id: spawn.id,
-        hp: typeof enemyState?.hp === 'number' ? enemyState.hp : enemy.getHp(),
-        obj: enemy
-      };
-
-      return enemy;
+        return enemy;
     });
 
     this.enemiesBot.forEach((enemy) => {
@@ -488,19 +486,33 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleCharacterDeath() {
-    if (!this.character || this.isReturningToMenu || !this.character.isDead()) return;
-    this.isReturningToMenu = true;
-    if (unit_manager.socket) unit_manager.socket.emit('playerDied');
-    this.cameras.main.stopFollow();
-
-    // Удаляем из глобального менеджера
-    if (unit_manager.info.players[unit_manager.my_id]) {
-        unit_manager.info.players[unit_manager.my_id].obj = null;
+    if (!this.character || this.isReturningToMenu || !this.character.isDead()) {
+      return;
     }
 
-    this.character.destroy();
-    this.character = null;
-    this.enemyManager?.destroy();
+    this.isReturningToMenu = true;
+
+    // 1. Немедленно сообщаем серверу
+    if (unit_manager.socket) {
+      unit_manager.socket.emit('playerDied');
+    }
+
+    // 2. Останавливаем камеру
+    this.cameras.main.stopFollow();
+
+    // 3. Очищаем данные в глобальном менеджере ПЕРЕД удалением объекта
+    if (unit_manager.info.players[unit_manager.my_id]) {
+      // Мы НЕ удаляем запись совсем (чтобы не было ошибок в других методах),
+      // но зануляем объект
+      unit_manager.info.players[unit_manager.my_id].obj = null;
+    }
+
+    // 4. Уничтожаем персонажа
+    const charToDestroy = this.character;
+    this.character = null; // update() больше не будет работать для него
+    charToDestroy.destroy();
+
+    // 5. Переходим в меню
     this.scene.start('MenuScene');
   }
 

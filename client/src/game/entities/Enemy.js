@@ -69,7 +69,7 @@ export class Enemy extends Phaser.GameObjects.Container {
 
   // ВОТ ЭТОТ МЕТОД БЫЛ УТЕРЯН
   syncHpText() {
-    if (!this.healthIndicator || !this.hitbox) return;
+    if (!this.active || !this.showStats || !this.healthIndicator) return;
     const textX = Math.round(this.hitbox.x);
     const textY = Math.round(this.hitbox.y - this.hitbox.height * 0.5 - 14);
     this.healthIndicator.setPosition(textX, textY - 20);
@@ -150,7 +150,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     if (this.attackZone) this.attackZone.destroy();
 
     if (this.hitbox) {
-      this.scene.physics.world.disableBody(this.hitbox.body);
+      // Удален ручной вызов disableBody
       this.hitbox.destroy();
     }
 

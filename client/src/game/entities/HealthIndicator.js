@@ -46,7 +46,10 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     this.nicknameText.setText(this.nickname);
   }
 
-  updateHp(currentHp, maxHp) {
+ updateHp(currentHp, maxHp) {
+
+    if (!this.active || !this.scene || !this.nicknameText || !this.nicknameText.scene) return;
+
     const safeMaxHp = Math.max(1, maxHp);
     const hpRatio = Phaser.Math.Clamp(currentHp / safeMaxHp, 0, 1);
     const left = -this.maxWidth * 0.5;
