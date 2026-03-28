@@ -7,6 +7,11 @@ import {utils} from "../utils.js";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
+const ENEMY_SPAWNS = [
+  { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE },
+  { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE },
+  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE }
+];
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -72,9 +77,20 @@ export class MainScene extends Phaser.Scene {
     if (this.character) {
       this.character.update();
       const {x, y} = this.character;
-      unit_manager.info.players[unit_manager.my_id].x = x;
-      unit_manager.info.players[unit_manager.my_id].y = y;
-      unit_manager.socket.emit('playerMovement', {x, y});
+      const playerState = unit_manager.info.players[unit_manager.my_id] || {
+        id: unit_manager.my_id
+      };
+      playerState.obj = this.character;
+      playerState.x = x;
+      playerState.y = y;
+      playerState.hp = this.character.getHp();
+      unit_manager.info.players[unit_manager.my_id] = playerState;
+
+      unit_manager.socket.emit('playerMovement', {
+        x,
+        y,
+        hp: this.character.getHp()
+      });
 
     }
 
@@ -91,6 +107,9 @@ export class MainScene extends Phaser.Scene {
       if(value.id !== unit_manager.my_id) {
         if (!value.obj) value.obj = this.createEnemy();
         value.obj.applyRemoteState(value.x, value.y, this.time.now);
+        if (typeof value.hp === 'number') {
+          value.obj.setHp(value.hp);
+        }
 
 
         // if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
@@ -153,6 +172,15 @@ export class MainScene extends Phaser.Scene {
 
       if (this.checkCollision(attackRect, enemyHitbox)) {
         console.log("Попал по игроку:", player.id);
+
+        if (typeof player.hp !== 'number') {
+          player.hp = 100;
+        }
+
+        player.hp = Math.max(0, player.hp - 10);
+        if (player.obj?.setHp) {
+          player.obj.setHp(player.hp);
+        }
 
         // 3. Сообщаем серверу, что мы нанесли урон
         unit_manager.socket.emit('playerHit', {
@@ -279,6 +307,15 @@ export class MainScene extends Phaser.Scene {
       showStats: true,
       nickname: 'Player'
     });
+    const playerState = unit_manager.info.players[unit_manager.my_id] || {
+      id: unit_manager.my_id
+    };
+    playerState.obj = this.character;
+    playerState.x = this.character.x;
+    playerState.y = this.character.y;
+    playerState.hp = this.character.getHp();
+    unit_manager.info.players[unit_manager.my_id] = playerState;
+
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
     this.physics.add.collider(
@@ -294,11 +331,22 @@ export class MainScene extends Phaser.Scene {
   }
 
   createEnemiesBot() {
-    this.enemiesBot = [
-      new Enemy(this, 360 * WORLD_SCALE, 650 * WORLD_SCALE),
-      new Enemy(this, 1120 * WORLD_SCALE, 580 * WORLD_SCALE),
-      new Enemy(this, 1540 * WORLD_SCALE, 250 * WORLD_SCALE)
-    ];
+    this.enemiesBot = ENEMY_SPAWNS.map((spawn) => {
+      const enemyState = unit_manager.info.enemies[spawn.id];
+      const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
+
+      if (typeof enemyState?.hp === 'number') {
+        enemy.setHp(enemyState.hp);
+      }
+
+      unit_manager.info.enemies[spawn.id] = {
+        id: spawn.id,
+        hp: typeof enemyState?.hp === 'number' ? enemyState.hp : enemy.getHp(),
+        obj: enemy
+      };
+
+      return enemy;
+    });
 
     this.enemiesBot.forEach((enemy) => {
       enemy.setDepth(2);
@@ -316,6 +364,11 @@ export class MainScene extends Phaser.Scene {
     const playerAttackBounds = isPlayerAttacking ? this.character.getAttackHitbox().getBounds() : null;
 
     this.enemiesBot.forEach((enemy) => {
+      const enemyState = unit_manager.info.enemies[enemy.id];
+      if (typeof enemyState?.hp === 'number' && enemyState.hp !== enemy.getHp()) {
+        enemy.setHp(enemyState.hp);
+      }
+
       enemy.update(this.character);
 
       if (enemy.isDead()) {
@@ -327,7 +380,17 @@ export class MainScene extends Phaser.Scene {
       }
 
       if (Phaser.Geom.Intersects.RectangleToRectangle(playerAttackBounds, enemy.getPhysicsTarget().getBounds())) {
-        enemy.takeDamage(this.character.getAttackDamage(), attackId);
+        const applied = enemy.takeDamage(this.character.getAttackDamage(), attackId);
+        if (applied) {
+          unit_manager.info.enemies[enemy.id] = {
+            id: enemy.id,
+            hp: enemy.getHp()
+          };
+          unit_manager.socket.emit('enemyHit', {
+            enemyId: enemy.id,
+            damage: this.character.getAttackDamage()
+          });
+        }
       }
     });
 
@@ -347,6 +410,9 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.isReturningToMenu = true;
+    if (unit_manager.socket) {
+      unit_manager.socket.emit('playerDied');
+    }
     this.cameras.main.stopFollow();
     this.character.destroy();
     this.character = null;
@@ -354,7 +420,10 @@ export class MainScene extends Phaser.Scene {
   }
 
   createEnemy() {
-    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: false });
+    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, {
+      showStats: true,
+      nickname: 'Player'
+    });
     enemy.setDepth(1);
     this.physics.add.collider(
         enemy.getPhysicsTarget(),

@@ -282,6 +282,24 @@ export class Character extends Phaser.GameObjects.Container {
     return this.maxHp;
   }
 
+  setHp(nextHp) {
+    this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
+    this.syncHpText();
+    return this.hp;
+  }
+
+  applySyncedDamage(amount, nextHp = null) {
+    if (typeof nextHp === 'number') {
+      this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
+    } else {
+      this.hp = Math.max(0, this.hp - amount);
+    }
+
+    this.syncHpText();
+    new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
+    return this.hp;
+  }
+
   isDead() {
     return this.hp <= 0;
   }
