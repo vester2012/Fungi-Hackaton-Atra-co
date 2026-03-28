@@ -43,8 +43,9 @@ export class MainScene extends Phaser.Scene {
     this.createEnemiesBot();
     this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
     this.createHud(viewWidth);
-    this.createBlackHole();
-
+    this.createBlackHole({x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE});
+    this.createBlackHole({x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE});
+    this.createBlackHole({x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE});
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
