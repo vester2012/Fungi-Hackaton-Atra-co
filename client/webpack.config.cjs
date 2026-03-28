@@ -2,6 +2,7 @@ const path = require('node:path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const portfinder = require('portfinder-sync');
+const CopyPlugin = require("copy-webpack-plugin");
 
 const port = portfinder.getPort(5173);
 
@@ -34,6 +35,11 @@ module.exports = (_, argv) => {
     },
 
     plugins: [
+      new CopyPlugin({
+        patterns: [
+          { from: "public/favicon.ico", to: "favicon.ico" }
+        ],
+      }),
       new HtmlWebpackPlugin({
         template: path.resolve(__dirname, 'index.html'),
         inject: 'body'
