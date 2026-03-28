@@ -28,7 +28,8 @@ const sessionDatabase = {}; // Все когда-либо заходившие (
 const enemies = {
   'enemy-1': { id: 'enemy-1', hp: 100 },
   'enemy-2': { id: 'enemy-2', hp: 100 },
-  'enemy-3': { id: 'enemy-3', hp: 100 }
+  'enemy-3': { id: 'enemy-3', hp: 100 },
+  'enemy-bee-1': { id: 'enemy-bee-1', hp: 10 }
 };
 
 function getRandomSpawnPoint() {

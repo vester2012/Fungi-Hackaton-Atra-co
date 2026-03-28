@@ -1,5 +1,6 @@
 import { Character } from '../entities/Character.js';
 import { Enemy } from '../entities/Enemy.js';
+import { FlyingEnemy } from '../entities/FlyingEnemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
@@ -10,9 +11,10 @@ import {utils} from "../utils.js";
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
 const ENEMY_SPAWNS = [
-  { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE },
-  { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE },
-  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE }
+  { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE, type: 'ground' },
+  { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE, type: 'ground' },
+  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE, type: 'ground' },
+  { id: 'enemy-bee-1', x: 900 * WORLD_SCALE, y: 360 * WORLD_SCALE, type: 'flying' }
 ];
 
 export class MainScene extends Phaser.Scene {
@@ -361,7 +363,8 @@ export class MainScene extends Phaser.Scene {
   createEnemiesBot() {
     this.enemiesBot = ENEMY_SPAWNS.map((spawn) => {
       const enemyState = unit_manager.info.enemies[spawn.id];
-      const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
+      const EnemyClass = spawn.type === 'flying' ? FlyingEnemy : Enemy;
+      const enemy = new EnemyClass(this, spawn.x, spawn.y, { id: spawn.id });
 
       if (typeof enemyState?.hp === 'number') {
         enemy.setHp(enemyState.hp);
@@ -378,7 +381,9 @@ export class MainScene extends Phaser.Scene {
 
     this.enemiesBot.forEach((enemy) => {
       enemy.setDepth(2);
-      this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
+      if (enemy.usesPlatformCollider !== false) {
+        this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
+      }
     });
   }
 
@@ -426,7 +431,7 @@ export class MainScene extends Phaser.Scene {
 
     // Фильтрация и очистка
     for (let i = this.enemiesBot.length - 1; i >= 0; i--) {
-        if (this.enemiesBot[i].isDead()) {
+        if (this.enemiesBot[i].isDead() && (!this.enemiesBot[i].isReadyToDestroy || this.enemiesBot[i].isReadyToDestroy(time))) {
             const enemy = this.enemiesBot[i];
             delete unit_manager.info.enemies[enemy.id]; // Очищаем ссылку в менеджере!
             enemy.destroy();

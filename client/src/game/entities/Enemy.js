@@ -40,7 +40,7 @@ export class Enemy extends Phaser.GameObjects.Container {
       textStroke: '#450a0a'
     });
 
-    this.attackZone = scene.add.rectangle(x, y - 24, 65, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
+    this.attackZone = scene.add.rectangle(x, y - 24, 45, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
   }
 
   update(time, delta, player) {
