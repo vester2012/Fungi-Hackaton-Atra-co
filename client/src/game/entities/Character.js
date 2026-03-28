@@ -1,4 +1,5 @@
-import { InputManager } from "../managers/InputManager";
+import { InputManager } from "../managers/InputManager";import { HealthIndicator } from "./HealthIndicator.js";
+import { DamagePopup } from "./DamagePopup.js";
 const Phaser = window.Phaser;
 import { unit_manager } from "../unit_manager.js";
 
@@ -59,6 +60,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.lastExternalX = x;
     this.isSyncingFromHitbox = false;
     this.showStats = options.showStats ?? true;
+    this.nickname = options.nickname ?? 'Player';
     this.currentAnimation = 'idle';
     this.lastDownTapAt = 0;
     this.dropThroughUntil = 0;
@@ -72,19 +74,19 @@ export class Character extends Phaser.GameObjects.Container {
     this.add(this.anim);
 
     if (this.showStats) {
-      this.hpText = scene.add.text(0, -150, '', {
-        fontFamily: 'Arial', fontSize: '18px', color: '#e2e8f0', stroke: '#0f172a', strokeThickness: 4
-      }).setOrigin(0.5, 1);
-      this.attackInfoText = scene.add.text(0, -130, '', {
-        fontFamily: 'Arial', fontSize: '16px', color: '#fdba74', stroke: '#431407', strokeThickness: 4
-      }).setOrigin(0.5, 1);
-      this.add(this.hpText);
-      this.add(this.attackInfoText);
+      this.healthIndicator = new HealthIndicator(scene, 0, -170, {
+        nickname:
+      this.nickname, textOffsetY: 0, barOffsetY: 14,
+        textColor: '#e2e8f0',
+        textStroke: '#0f172a'
+      });
+      this.add(this.healthIndicator);
     }
 
     this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
 
     this.syncHpText();
+    this.events = new Phaser.Events.EventEmitter();
   }
 
   update() {
@@ -218,11 +220,8 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   syncHpText() {
-    if (!this.showStats || !this.hpText || !this.attackInfoText || !this.hitbox) return;
-    const cooldownLeft = Math.max(0, this.attackCooldownMs - (this.scene.time.now - this.lastAttackAt));
-    const attackState = this.isAttacking() ? 'ATTACK' : cooldownLeft > 0 ? `CD ${Math.ceil(cooldownLeft)}ms` : 'READY';
-    this.hpText.setText(`HP ${this.hp}/${this.maxHp}`);
-    this.attackInfoText.setText(`ATK ${this.baseDamage} | ${attackState}`);
+    if (!this.showStats || !this.healthIndicator || !this.hitbox) return;
+    this.healthIndicator.updateHp(this.hp, this.maxHp);
   }
 
   syncAttackHitbox() {
@@ -255,6 +254,8 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackUntil = now + this.attackDurationMs;
     this.attackId += 1;
     this.syncAttackHitbox();
+this.events.emit('attack');
+
     if (unit_manager.socket) unit_manager.socket.emit('playerAttack', { attackId: this.attackId });
     return true;
   }
@@ -293,6 +294,7 @@ export class Character extends Phaser.GameObjects.Container {
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
     this.syncHpText();
+    new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
 
@@ -312,7 +314,26 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
-    [this.attackInfoText, this.hpText, this.attackHitbox, this.hitbox].forEach(obj => obj?.destroy());
+    if (this.healthIndicator) {
+      this.healthIndicator.destroy();
+      this.healthIndicator = null;
+    }
+
+    if (this.attackHitbox) {
+      this.attackHitbox.destroy();
+      this.attackHitbox = null;
+    }
+
+    if (this.hitbox) {
+      this.hitbox.destroy();
+      this.hitbox = null;
+    }
+
+    // Если нужно, чистим ивенты инпута
+    if (this.controller) {
+      this.controller = null;
+    }
+
     super.destroy(fromScene);
   }
 }

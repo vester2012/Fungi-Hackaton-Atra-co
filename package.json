@@ -16,6 +16,7 @@
     "start": "npm run start:server"
   },
   "dependencies": {
+    "eruda": "^3.4.3",
     "express": "^4.19.2",
     "nvm": "^0.0.4",
     "socket.io": "^4.8.3"

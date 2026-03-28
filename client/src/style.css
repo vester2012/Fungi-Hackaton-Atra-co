@@ -1,6 +1,14 @@
+@font-face {
+  font-family: 'JungleAdventurer';
+  src: url('./assets/fonts/JungleAdventurer.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
-  font-family: Arial, sans-serif;
+  font-family: 'JungleAdventurer', sans-serif;
   background: #111827;
   color: #f9fafb;
 }
@@ -24,4 +32,3 @@ body {
 canvas {
   display: block;
 }
-

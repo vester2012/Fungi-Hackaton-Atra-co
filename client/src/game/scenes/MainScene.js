@@ -5,6 +5,7 @@ import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
 import {WallSlideZone} from "../systems/WallSlideZone";
 import {ZoneManager} from "../systems/ZoneManager";
+import {utils} from "../utils.js";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -19,17 +20,17 @@ export class MainScene extends Phaser.Scene {
 
     const viewWidth = this.scale.width;
     const viewHeight = this.scale.height;
-    const worldWidth = viewWidth * WORLD_SCALE;
-    const worldHeight = viewHeight * WORLD_SCALE;
+    this.worldWidth = viewWidth * WORLD_SCALE;
+    this.worldHeight = viewHeight * WORLD_SCALE;
 
     this.cameras.main.setBackgroundColor('#132238');
     this.cameras.main.roundPixels = true;
-    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
-    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
-    this.drawBackground(worldWidth, worldHeight);
-    this.drawMap(worldWidth, worldHeight);
-    this.createCollisionMap(worldWidth, worldHeight);
+    this.drawBackground(this.worldWidth, this.worldHeight);
+    this.drawMap(this.worldWidth, this.worldHeight);
+    this.createCollisionMap(this.worldWidth, this.worldHeight);
     this.zoneManager = new ZoneManager(this);
     this.createZones(worldWidth, worldHeight);
     this.createCharacter();
@@ -37,15 +38,17 @@ export class MainScene extends Phaser.Scene {
     this.createEnemiesBot();
     this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
     this.createHud(viewWidth);
+    this.createBlackHole();
+
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '42px',
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);
 
     this.add.text(viewWidth * 0.5, 138, 'Greybox map prototype', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '20px',
       color: '#cbd5e1'
     }).setOrigin(0.5).setScrollFactor(0);
@@ -55,7 +58,7 @@ export class MainScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     const backLabel = this.add.text(viewWidth * 0.5, viewHeight - 90, 'Back To Menu', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '24px',
       color: '#111827'
     }).setOrigin(0.5).setScrollFactor(0);
@@ -108,23 +111,24 @@ export class MainScene extends Phaser.Scene {
 
     this.handleCharacterDeath();
     this.updateEnemiesBot();
+    this.updateEnemysPlayers();
     this.updateHud();
     this.updateSocketInfo();
-    this.updateEnemys();
-
   }
 
-  updateEnemys() {
+  updateEnemysPlayers() {
     let players = unit_manager.info.players;
     for (const [key, value] of Object.entries(players)) {
       if(value.id !== unit_manager.my_id) {
         if (!value.obj) value.obj = this.createEnemy();
         value.obj.applyRemoteState(value.x, value.y, this.time.now);
 
-        if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
-          value.lastPlayedAttackId = value.pendingAttackId;
-          value.obj.playRemoteAttack(this.time.now);
-        }
+
+        // if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
+        //   value.lastPlayedAttackId = value.pendingAttackId;
+        //   value.obj.playRemoteAttack(this.time.now);
+        //   this.getCollisionAttack();
+        // }
       }
     }
   }
@@ -142,8 +146,52 @@ export class MainScene extends Phaser.Scene {
       this.textInfo.setText("info socket:" + "\n" + str)
 
     } else {
-      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'Arial', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
+      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
     }
+  }
+
+  checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.w &&
+        rect1.x + rect1.w > rect2.x &&
+        rect1.y < rect2.y + rect2.h &&
+        rect1.y + rect1.h > rect2.y;
+  }
+
+  getCollisionAttack() {
+    // 1. Собираем массив врагов (все кроме себя)
+    let otherPlayers = utils.parsePlayersToArray(unit_manager.info.players)
+        .filter(el => el.id !== unit_manager.my_id);
+
+    // 2. Определяем хитбокс атаки в мировых координатах
+    let attackRect = {
+      x: //this.character.x +
+          this.character.attackHitbox.x,
+      y: //this.character.y +
+          this.character.attackHitbox.y,
+      w: this.character.attackHitbox.width, // ширина зоны удара
+      h: this.character.attackHitbox.height  // высота зоны удара
+    };
+
+    otherPlayers.forEach(player => {
+      // Предположим, что у каждого игрока в объекте есть хитбокс с x, y, w, h
+      // Важно: x и y врага тоже должны быть мировыми координатами!
+      let enemyHitbox = {
+        x: player.obj.hitbox.x,
+        y: player.obj.hitbox.y,
+        w: player.obj.hitbox.width,
+        h: player.obj.hitbox.height
+      };
+
+      if (this.checkCollision(attackRect, enemyHitbox)) {
+        console.log("Попал по игроку:", player.id);
+
+        // 3. Сообщаем серверу, что мы нанесли урон
+        unit_manager.socket.emit('playerHit', {
+          targetId: player.id,
+          damage: 10
+        });
+      }
+    });
   }
 
   drawBackground(width, height) {
@@ -219,7 +267,7 @@ export class MainScene extends Phaser.Scene {
       .setStrokeStyle(5 * s, 0xffcc80, 0.9);
 
     this.add.text(playerSpawn.x + 40 * s, playerSpawn.y - 6 * s, 'Spawn', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: `${20 * s}px`,
       color: '#fff3e0'
     });
@@ -258,7 +306,10 @@ export class MainScene extends Phaser.Scene {
   }
 
   createCharacter() {
-    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: true });
+    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, {
+      showStats: true,
+      nickname: 'Player'
+    });
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
     this.physics.add.collider(
@@ -267,6 +318,10 @@ export class MainScene extends Phaser.Scene {
       undefined,
       (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
     );
+
+    this.character.events.on('attack', () => {
+      this.getCollisionAttack();
+    })
   }
 
   createEnemiesBot() {
@@ -343,7 +398,7 @@ export class MainScene extends Phaser.Scene {
 
   createHud(viewWidth) {
     this.controlsText = this.add.text(viewWidth - 42, 34, 'WASD move | Space jump | Enter attack', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '18px',
       color: '#cbd5e1',
       align: 'right'
@@ -358,7 +413,7 @@ export class MainScene extends Phaser.Scene {
 
   createDebugZoomControls(viewWidth) {
     const zoomLabel = this.add.text(viewWidth - 210, 42, 'Zoom', {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '20px',
       color: '#e2e8f0'
     }).setScrollFactor(0);
@@ -385,7 +440,7 @@ export class MainScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     const text = this.add.text(x, y, label, {
-      fontFamily: 'Arial',
+      fontFamily: 'JungleAdventurer',
       fontSize: '28px',
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);
@@ -409,5 +464,66 @@ export class MainScene extends Phaser.Scene {
 
     graphics.fillStyle(0x000000, 0.08);
     graphics.fillRoundedRect(x + 14 * s, y + 18 * s, width - 28 * s, height - 30 * s, 14 * s);
+  }
+
+  createBlackHole(position = {x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE}){
+    this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
+    this.animHole.setScale(0.5);
+
+    this.blackHoleZone = this.add.zone(
+      this.animHole.x - 35 * WORLD_SCALE,
+      this.animHole.y - 15 * WORLD_SCALE,
+      80 * WORLD_SCALE,
+      50 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(this.blackHoleZone);
+
+    this.blackHoleZone.body.setAllowGravity(false);
+    this.blackHoleZone.body.setImmovable(true);
+
+    this.physics.add.collider(
+      this.character.getPhysicsTarget(),
+      this.platforms
+    );
+
+    this.physics.add.overlap(
+      this.character.getPhysicsTarget(),
+      this.blackHoleZone,
+      this.onBlackHoleTouch,
+      null,
+      this
+    );
+  }
+
+  onBlackHoleTouch(characterBody, holeZone) {
+    if (this.isBlackHoleTriggered) return;
+    this.isBlackHoleTriggered = true;
+    console.log('Персонаж коснулся черной дыры');
+
+    const target = this.character.getPhysicsTarget();
+
+    const x = Phaser.Math.Between(100, this.worldWidth - 100);
+    const y = Phaser.Math.Between(100, this.worldHeight - 100);
+
+    // телепорт
+    this.tweens.add({
+      targets: this.character,
+      alpha: 0,
+      scaleX: 0.1,
+      scaleY: 0.1,
+      duration: 300
+    });
+    this.tweens.add({
+      targets: target,
+      alpha: 0,
+      duration: 700,
+      onComplete: () => {
+        target.setPosition(x, y);
+        this.character.setAlpha(1);
+        this.character.setScale(1);
+        this.isBlackHoleTriggered = false;
+      }
+    });
   }
 }
