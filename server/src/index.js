@@ -5,12 +5,28 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+//const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+const PATH_PUBLIC = '../../client/dist';
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // Порт твоего Webpack Dev Server
+    methods: ["GET", "POST"]
+  }
+});
+
+app.use(express.static(path.join(__dirname, PATH_PUBLIC)));
+
+// Все запросы, которые не обработаны иначе, отдают index.html из dist
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, PATH_PUBLIC, 'index.html'));
+});
+
 
 // Хранилище игроков
 const players = {};
+
+
 
 io.on('connection', (socket) => {
   console.log(`Игрок подключился: ${socket.id}`);

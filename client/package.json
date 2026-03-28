@@ -2,15 +2,19 @@
   "name": "client",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "dev:open": "webpack serve --config webpack.config.cjs --mode development",
-    "dev:noopen": "webpack serve --config webpack.config.cjs --mode development --open",
+    "dev:noopen": "webpack serve --config webpack.config.cjs --mode development",
+    "dev": "webpack serve --config webpack.config.cjs --mode development --open",
     "build": "webpack --config webpack.config.cjs --mode production"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.2",
     "html-webpack-plugin": "^5.6.3",
+    "portfinder-sync": "^0.0.2",
     "style-loader": "^4.0.0",
     "webpack": "^5.101.3",
     "webpack-cli": "^6.0.1",

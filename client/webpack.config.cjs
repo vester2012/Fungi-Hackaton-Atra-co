@@ -1,6 +1,9 @@
 const path = require('node:path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const portfinder = require('portfinder-sync');
+
+const port = portfinder.getPort(5173);
 
 module.exports = (_, argv) => {
   const isProd = argv.mode === 'production';
@@ -13,6 +16,7 @@ module.exports = (_, argv) => {
       clean: true
     },
     devtool: isProd ? false : 'eval-source-map',
+
     module: {
       rules: [
         {
@@ -21,12 +25,14 @@ module.exports = (_, argv) => {
         }
       ]
     },
+
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
         '@libs': path.resolve(__dirname, '../libs')
       }
     },
+
     plugins: [
       new HtmlWebpackPlugin({
         template: path.resolve(__dirname, 'index.html'),
@@ -36,21 +42,25 @@ module.exports = (_, argv) => {
         patterns: [
           {
             from: path.resolve(__dirname, 'src/assets'),
-            to: 'assets'
+            to: 'assets',
+            noErrorOnMissing: true
           },
           {
             from: path.resolve(__dirname, '../libs/phaser.js'),
-            to: 'libs/phaser.js'
+            to: 'libs/phaser.js',
+            noErrorOnMissing: true
           },
           {
             from: path.resolve(__dirname, '../libs/SpinePluginDebug.js'),
-            to: 'libs/SpinePluginDebug.js'
+            to: 'libs/SpinePluginDebug.js',
+            noErrorOnMissing: true
           }
         ]
       })
     ],
+
     devServer: {
-      port: 5173,
+      port: port,
       static: {
         directory: path.resolve(__dirname, 'dist')
       },
