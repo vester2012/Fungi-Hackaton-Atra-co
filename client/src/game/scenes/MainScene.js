@@ -683,7 +683,7 @@ export class MainScene extends Phaser.Scene {
       alpha: 0,
       duration: 1200,
       onComplete: () => {
-        this.hearts -= 1
+        this.hearts--;
         if (heart) {
           heart.posRef.active = false;
           heart.destroy();
