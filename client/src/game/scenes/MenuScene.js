@@ -64,7 +64,10 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.createMenuButton(width * 0.5, 270 * 1.35, 360, 64, 'Start Game', 0x22c55e, () => {
-      this.scene.start('MainScene');
+      unit_manager.socket.emit("join_room", { sid: localStorage.getItem('game_session_id'), idRoom: 1, passRoom: ''});
+      unit_manager.socket.once('joined_room_success', (data) => {
+        this.scene.start('MainScene');
+      });
     });
 
     this.createMenuButton(width * 0.5, 360 * 1.35, 360, 64, 'Create room', 0x334155, () => {
