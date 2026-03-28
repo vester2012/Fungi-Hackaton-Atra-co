@@ -1,4 +1,5 @@
-import { InputManager } from "../managers/InputManager";import { HealthIndicator } from "./HealthIndicator.js";
+import { InputManager } from "../managers/InputManager";
+import { HealthIndicator } from "./HealthIndicator.js";
 import { DamagePopup } from "./DamagePopup.js";
 const Phaser = window.Phaser;
 import { unit_manager } from "../unit_manager.js";
@@ -71,6 +72,8 @@ export class Character extends Phaser.GameObjects.Container {
     this.anim = scene.add.spine(0, -90, 'fish_SPO', 'idle', true);
     this.anim.setScale(0.1);
     this.anim.setMix('run', 'idle', 0.25);
+    this.anim.setMix('jump', 'fly', 0.25);
+    this.anim.setMix('fly', 'jump', 0.25);
     this.add(this.anim);
 
     if (this.showStats) {
@@ -85,7 +88,7 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   // Обновляем сигнатуру метода
-  update(time, delta) {
+  update(time = this.scene.time.now, delta = this.scene.game.loop.delta) {
     this.controller.update();
     const now = time; // Используем время из аргумента
     const dt = delta / 1000; // Дельта в секундах для расчетов
@@ -158,8 +161,10 @@ export class Character extends Phaser.GameObjects.Container {
     }
 
     if (!this.isAttacking()) {
-      if (this.wallSlideState.isActive && !isGrounded) {
-        this.setAnimation('idle', true);
+      if (!isGrounded) {
+        this.setAnimation(this.hitbox.body.velocity.y < 0 ? 'jump' : 'fly');
+      } else if (this.wallSlideState.isActive) {
+        this.setAnimation('fly');
       } else {
         this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
       }
@@ -267,10 +272,17 @@ export class Character extends Phaser.GameObjects.Container {
 
   applyRemoteState(x, y, now = this.scene.time.now) {
     const movedX = x - this.x;
+    const movedY = y - this.y;
     const isMoving = Math.abs(movedX) > 1;
     this.setPosition(x, y);
     if (movedX !== 0) this.applyFacingDirection(movedX < 0 ? -1 : 1);
-    if (!this.isAttacking()) this.setAnimation(isMoving ? 'run' : 'idle', true);
+    if (!this.isAttacking()) {
+      if (Math.abs(movedY) > 1) {
+        this.setAnimation(movedY < 0 ? 'jump' : 'fly');
+      } else {
+        this.setAnimation(isMoving ? 'run' : 'idle', true);
+      }
+    }
     this.syncAttackHitbox();
   }
 
