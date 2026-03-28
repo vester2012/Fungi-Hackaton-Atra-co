@@ -10,11 +10,9 @@ bootGame('app');
 //* SOCKET *//
 
 const socket = io();
-
 let players = unit_manager.info.players;
-let myId = null;
 
-socket.on('connect', () => { myId = socket.id; });
+socket.on('connect', () => { unit_manager.my_id = socket.id; });
 
 // Получаем список всех игроков при входе
 socket.on('currentPlayers', (serverPlayers) => {
@@ -38,3 +36,6 @@ socket.on('playerMoved', (playerInfo) => {
 socket.on('playerDisconnected', (playerId) => {
     delete players[playerId];
 });
+
+
+unit_manager.socket = socket;

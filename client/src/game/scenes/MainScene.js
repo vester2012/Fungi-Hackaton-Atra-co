@@ -63,6 +63,11 @@ export class MainScene extends Phaser.Scene {
   update() {
     if (this.character) {
       this.character.update();
+      const {x, y} = this.character;
+      unit_manager.info.players[unit_manager.my_id].x = x;
+      unit_manager.info.players[unit_manager.my_id].y = y;
+      unit_manager.socket.emit('playerMovement', {x, y});
+
     }
     this.updateHud();
     this.updateSocketInfo();
