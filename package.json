@@ -12,5 +12,8 @@
     "build:client": "npm run build --workspace client",
     "dev:server": "npm run dev --workspace server",
     "start:server": "npm run start --workspace server"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.3"
   }
 }
