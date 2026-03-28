@@ -403,7 +403,7 @@ export class Character extends Phaser.GameObjects.Container {
     // 1. Снимаем все слушатели с собственного эмиттера
     if (this.events) {
       this.events.removeAllListeners();
-      this.events.shutdown();
+      this.events.destroy(); // В новых версиях Phaser лучше использовать destroy вместо shutdown
     }
 
     // 2. Явно уничтожаем Spine объект
@@ -421,8 +421,7 @@ export class Character extends Phaser.GameObjects.Container {
     }
 
     if (this.hitbox) {
-      // Важно для Arcade Physics: убираем тело из симуляции
-      this.scene.physics.world.disableBody(this.hitbox.body);
+      // Удален ручной вызов disableBody, Phaser очистит его сам при destroy
       this.hitbox.destroy();
     }
 

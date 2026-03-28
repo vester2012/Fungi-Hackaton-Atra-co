@@ -22,6 +22,7 @@ export class MenuScene extends Phaser.Scene {
     this.load.audio('kick1', ['assets/audio/ma-kick1.mp3', 'assets/audio/ma-kick1.ogg']);
     this.load.audio('bg-music', ['assets/audio/bg-music.mp3', 'assets/audio/bg-music.ogg']);
 
+    this.load.json('map_1', '../../assets/level_map.json');
   }
 
   create() {

@@ -27,11 +27,26 @@ export class MainScene extends Phaser.Scene {
 
     const viewWidth = this.scale.width;
     const viewHeight = this.scale.height;
-    this.worldWidth = viewWidth * WORLD_SCALE;
-    this.worldHeight = viewHeight * WORLD_SCALE;
+
     this.hearts = 0;
-    this.heartsConstNumber = 3; // сколько максимум сердечек на поле одномоментно
-    this.heartHealing = 25; // на сколько сердечко восстанавливает здоровье
+    this.heartsConstNumber = 3;
+    this.heartHealing = 25;
+
+    // Базовые массивы для данных из JSON
+    this.enemySpawns = [];
+    this.positionsForHeart =[];
+    this.spawnPoint = { x: 220 * WORLD_SCALE, y: 650 * WORLD_SCALE }; // Точка по умолчанию
+
+    // Пробуем получить карту из кэша (если она была загружена в MenuScene)
+    const levelData = this.cache.json.get('map_1');
+
+    if (levelData && levelData.world) {
+      this.worldWidth = levelData.world.width;
+      this.worldHeight = levelData.world.height;
+    } else {
+      this.worldWidth = viewWidth * WORLD_SCALE;
+      this.worldHeight = viewHeight * WORLD_SCALE;
+    }
 
     this.cameras.main.setBackgroundColor('#132238');
     this.cameras.main.roundPixels = true;
@@ -39,10 +54,19 @@ export class MainScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
     this.drawBackground(this.worldWidth, this.worldHeight);
-    this.drawMap(this.worldWidth, this.worldHeight);
-    this.createCollisionMap(this.worldWidth, this.worldHeight);
+
+    this.platforms = this.physics.add.staticGroup();
     this.zoneManager = new ZoneManager(this);
-    this.createZones(this.worldWidth, this.worldHeight);
+
+    // ПОСТРОЕНИЕ УРОВНЯ
+    if (levelData) {
+      this.buildLevelFromJson(levelData);
+    } else {
+      console.warn('level_map.json не найден! Загружена стандартная карта.');
+      this.buildFallbackLevel();
+    }
+
+    // Инициализация персонажа на точке спавна
     this.createCharacter();
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();
@@ -59,12 +83,7 @@ export class MainScene extends Phaser.Scene {
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);
 
-    this.add.text(viewWidth * 0.5, 138, 'Greybox map prototype', {
-      fontFamily: 'JungleAdventurer',
-      fontSize: '20px',
-      color: '#cbd5e1'
-    }).setOrigin(0.5).setScrollFactor(0);
-
+    // UI Возврата
     const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1)
       .setInteractive({ useHandCursor: true })
       .setScrollFactor(0);
@@ -87,38 +106,141 @@ export class MainScene extends Phaser.Scene {
     this.generateHearts();
   }
 
+  // --- ИНТЕГРАЦИЯ РЕДАКТОРА УРОВНЕЙ ---
+  buildLevelFromJson(levelData) {
+    const graphics = this.add.graphics();
+    const soil = 0x59412f;
+    const grass = 0x7cb342;
+    const dropThroughSoil = 0x334155;
+    const dropThroughGrass = 0x475569;
 
-  createZones(width, height) {
+    // 1. Рисуем Платформы и Зоны
+    levelData.platforms.forEach(p => {
+      const x = p.centerX;
+      const y = p.centerY;
+      const w = p.width;
+      const h = p.height;
+
+      if (p.type === 'solid') {
+        // top-left координаты для графики
+        this.drawPlatform(graphics, x - w/2, y - h/2, w, h, soil, grass);
+        this.addPlatformBody(x, y, w, h, { type: Platform.TYPES.SOLID });
+      }
+      else if (p.type === 'drop-through') {
+        this.drawPlatform(graphics, x - w/2, y - h/2, w, h, dropThroughSoil, dropThroughGrass);
+        this.addPlatformBody(x, y, w, h, { type: Platform.TYPES.DROP_THROUGH });
+      }
+      else if (p.type === 'wall-slide') {
+        this.zoneManager.addZone(new WallSlideZone(this, x, y, w, h, { direction: p.direction, debug: true }));
+      }
+    });
+
+    // 2. Расставляем Точки (Спавны, Враги, Лут)
+    let enemyIdx = 1;
+    levelData.points.forEach(pt => {
+      if (pt.type === 'spawn') {
+        this.spawnPoint = { x: pt.x, y: pt.y };
+        const spawnCircle = this.add.circle(pt.x, pt.y, 22, 0xff7043, 0.4).setStrokeStyle(5, 0xffcc80, 0.9);
+        this.add.text(pt.x + 40, pt.y - 6, 'Spawn', { fontFamily: 'JungleAdventurer', fontSize: '20px', color: '#fff3e0' });
+      }
+      else if (pt.type === 'enemy') {
+        this.enemySpawns.push({ id: `enemy-json-${enemyIdx++}`, x: pt.x, y: pt.y, type: 'ground' });
+      }
+      else if (pt.type === 'heart') {
+        this.positionsForHeart.push({ x: pt.x, y: pt.y, active: false });
+      }
+      else if (pt.type === 'hole') {
+        this.createBlackHole({ x: pt.x, y: pt.y });
+      }
+    });
+
+    // Если на карте забыли поставить сердца, добавим одно по умолчанию, чтобы код не упал
+    if (this.positionsForHeart.length === 0) {
+      this.positionsForHeart.push({ x: this.worldWidth / 2, y: this.worldHeight / 2, active: false });
+    }
+  }
+
+  // --- СТАРАЯ ХАРДКОД-КАРТА (FALLBACK) ---
+  buildFallbackLevel() {
     const s = WORLD_SCALE;
-    const isDebug = true; // Включи для предпросмотра (зоны будут розовыми)
+    const graphics = this.add.graphics();
+    const soil = 0x59412f; const grass = 0x7cb342; const rock = 0x7f8c8d;
 
-    // Пример: добавляем зону скольжения на правую стену прямоугольника (185x 857y)
-    // Параметры Rectangle: x (центр), y (центр), width, height
-    // Указываем direction: -1 (персонаж прилипнет, если нажмет влево)
-    this.zoneManager.addZone(
-        new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, {
-          direction: -1,
-          debug: isDebug
-        })
-    );
+    // Рисуем старую графику
+    this.drawPlatform(graphics, 0, this.worldHeight - 170 * s, this.worldWidth, 170 * s, soil, grass);
+    this.drawPlatform(graphics, 150 * s, 700 * s, 330 * s, 58 * s, soil, grass);
+    this.drawPlatform(graphics, 430 * s, 610 * s, 220 * s, 48 * s, soil, grass);
+    this.drawPlatform(graphics, 680 * s, 535 * s, 210 * s, 44 * s, soil, grass);
+    this.drawPlatform(graphics, 935 * s, 462 * s, 230 * s, 46 * s, soil, grass);
+    this.drawPlatform(graphics, 1220 * s, 392 * s, 210 * s, 44 * s, soil, grass);
+    this.drawPlatform(graphics, 1490 * s, 334 * s, 200 * s, 42 * s, soil, grass);
+    this.drawPlatform(graphics, 1725 * s, 270 * s, 170 * s, 40 * s, soil, grass);
+    this.drawPlatform(graphics, 980 * s, 730 * s, 300 * s, 56 * s, soil, grass);
+    this.drawPlatform(graphics, 1340 * s, 620 * s, 220 * s, 46 * s, soil, grass);
+    this.drawPlatform(graphics, 1610 * s, 520 * s, 170 * s, 40 * s, soil, grass);
+    this.drawPlatform(graphics, 330 * s, 455 * s, 150 * s, 40 * s, soil, grass);
+    this.drawPlatform(graphics, 520 * s, 360 * s, 140 * s, 36 * s, soil, grass);
+    this.drawPlatform(graphics, 720 * s, 280 * s, 130 * s, 34 * s, soil, grass);
 
-    // Добавляем зону скольжения на левую стену (direction: 1)
-    this.zoneManager.addZone(
-        new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, {
-          direction: 1,
-          debug: isDebug
-        })
-    );
+    graphics.fillStyle(rock, 1);
+    graphics.fillRoundedRect(122 * s, 804 * s, 126 * s, 106 * s, 14 * s);
+    graphics.fillRoundedRect(724 * s, 822 * s, 154 * s, 88 * s, 16 * s);
+    graphics.fillRoundedRect(1440 * s, 778 * s, 188 * s, 132 * s, 18 * s);
+    graphics.fillRoundedRect(1742 * s, 610 * s, 94 * s, 82 * s, 14 * s);
+    graphics.fillRoundedRect(576 * s, 272 * s, 62 * s, 68 * s, 12 * s);
 
-    // И так далее. Теперь ты можешь навешивать WallSlideZone поверх любых стен!
+    // Старые коллайдеры
+    this.addPlatformBody(this.worldWidth * 0.5, this.worldHeight - 85 * s, this.worldWidth, 170 * s, { type: Platform.TYPES.SOLID });
+    this.addPlatformBody(315 * s, 729 * s, 330 * s, 58 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(540 * s, 634 * s, 220 * s, 48 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(785 * s, 557 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1050 * s, 485 * s, 230 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1325 * s, 414 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1590 * s, 355 * s, 200 * s, 42 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1810 * s, 290 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1130 * s, 758 * s, 300 * s, 56 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1450 * s, 643 * s, 220 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(1695 * s, 540 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(405 * s, 475 * s, 150 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(590 * s, 378 * s, 140 * s, 36 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(785 * s, 297 * s, 130 * s, 34 * s, { type: Platform.TYPES.DROP_THROUGH });
+    this.addPlatformBody(185 * s, 857 * s, 126 * s, 106 * s, { type: Platform.TYPES.SOLID });
+    this.addPlatformBody(801 * s, 866 * s, 154 * s, 88 * s, { type: Platform.TYPES.SOLID });
+    this.addPlatformBody(1534 * s, 844 * s, 188 * s, 132 * s, { type: Platform.TYPES.SOLID });
+    this.addPlatformBody(1789 * s, 651 * s, 94 * s, 82 * s, { type: Platform.TYPES.SOLID });
+    this.addPlatformBody(607 * s, 306 * s, 62 * s, 68 * s, { type: Platform.TYPES.SOLID });
+
+    // Старые Зоны скольжения
+    this.zoneManager.addZone(new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, { direction: -1, debug: true }));
+    this.zoneManager.addZone(new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, { direction: 1, debug: true }));
+
+    // Старые Спавны
+    this.enemySpawns =[
+      { id: 'enemy-1', x: 360 * s, y: 650 * s, type: 'ground' },
+      { id: 'enemy-2', x: 1120 * s, y: 580 * s, type: 'ground' },
+      { id: 'enemy-3', x: 1540 * s, y: 250 * s, type: 'ground' }
+    ];
+
+    this.positionsForHeart =[
+      {x: 1400 * s, y: 580 * s, active: false},
+      {x: 1700 * s, y: 470 * s, active: false},
+      {x: 1800 * s, y: 230 * s, active: false},
+      {x: 1100 * s, y: 420 * s, active: false},
+      {x: 820 * s, y: 240 * s, active: false},
+      {x: 760 * s, y: 490 * s, active: false},
+      {x: 360 * s, y: 410 * s, active: false}
+    ];
+
+    this.createBlackHole({x: 500 * s, y: 850 * s});
+    this.createBlackHole({x: 550 * s, y: 450 * s});
+    this.createBlackHole({x: 1300 * s, y: 850 * s});
   }
   update(time, delta) {
     if (this.character) {
       this.character.update(time, delta);
       const {x, y} = this.character;
-      const playerState = unit_manager.info.players[unit_manager.my_id] || {
-        id: unit_manager.my_id
-      };
+      const playerState = unit_manager.info.players[unit_manager.my_id] || { id: unit_manager.my_id };
+
       playerState.obj = this.character;
       playerState.x = x;
       playerState.y = y;
@@ -268,72 +390,6 @@ export class MainScene extends Phaser.Scene {
     graphics.fillPath();
   }
 
-  drawMap(width, height) {
-    const s = WORLD_SCALE;
-    const graphics = this.add.graphics();
-
-    const soil = 0x59412f;
-    const grass = 0x7cb342;
-    const rock = 0x7f8c8d;
-
-    this.drawPlatform(graphics, 0, height - 170 * s, width, 170 * s, soil, grass);
-    this.drawPlatform(graphics, 150 * s, 700 * s, 330 * s, 58 * s, soil, grass);
-    this.drawPlatform(graphics, 430 * s, 610 * s, 220 * s, 48 * s, soil, grass);
-    this.drawPlatform(graphics, 680 * s, 535 * s, 210 * s, 44 * s, soil, grass);
-    this.drawPlatform(graphics, 935 * s, 462 * s, 230 * s, 46 * s, soil, grass);
-    this.drawPlatform(graphics, 1220 * s, 392 * s, 210 * s, 44 * s, soil, grass);
-    this.drawPlatform(graphics, 1490 * s, 334 * s, 200 * s, 42 * s, soil, grass);
-    this.drawPlatform(graphics, 1725 * s, 270 * s, 170 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 980 * s, 730 * s, 300 * s, 56 * s, soil, grass);
-    this.drawPlatform(graphics, 1340 * s, 620 * s, 220 * s, 46 * s, soil, grass);
-    this.drawPlatform(graphics, 1610 * s, 520 * s, 170 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 330 * s, 455 * s, 150 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 520 * s, 360 * s, 140 * s, 36 * s, soil, grass);
-    this.drawPlatform(graphics, 720 * s, 280 * s, 130 * s, 34 * s, soil, grass);
-
-    graphics.fillStyle(rock, 1);
-    graphics.fillRoundedRect(122 * s, 804 * s, 126 * s, 106 * s, 14 * s);
-    graphics.fillRoundedRect(724 * s, 822 * s, 154 * s, 88 * s, 16 * s);
-    graphics.fillRoundedRect(1440 * s, 778 * s, 188 * s, 132 * s, 18 * s);
-    graphics.fillRoundedRect(1742 * s, 610 * s, 94 * s, 82 * s, 14 * s);
-    graphics.fillRoundedRect(576 * s, 272 * s, 62 * s, 68 * s, 12 * s);
-
-    const playerSpawn = this.add.circle(220 * s, 650 * s, 22 * s, 0xff7043, 0.4)
-      .setStrokeStyle(5 * s, 0xffcc80, 0.9);
-
-    this.add.text(playerSpawn.x + 40 * s, playerSpawn.y - 6 * s, 'Spawn', {
-      fontFamily: 'JungleAdventurer',
-      fontSize: `${20 * s}px`,
-      color: '#fff3e0'
-    });
-  }
-
-  createCollisionMap(width, height) {
-    const s = WORLD_SCALE;
-
-    this.platforms = this.physics.add.staticGroup();
-
-    this.addPlatformBody(width * 0.5, height - 85 * s, width, 170 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(315 * s, 729 * s, 330 * s, 58 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(540 * s, 634 * s, 220 * s, 48 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(785 * s, 557 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1050 * s, 485 * s, 230 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1325 * s, 414 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1590 * s, 355 * s, 200 * s, 42 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1810 * s, 290 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1130 * s, 758 * s, 300 * s, 56 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1450 * s, 643 * s, 220 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1695 * s, 540 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(405 * s, 475 * s, 150 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(590 * s, 378 * s, 140 * s, 36 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(785 * s, 297 * s, 130 * s, 34 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(185 * s, 857 * s, 126 * s, 106 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(801 * s, 866 * s, 154 * s, 88 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(1534 * s, 844 * s, 188 * s, 132 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(1789 * s, 651 * s, 94 * s, 82 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(607 * s, 306 * s, 62 * s, 68 * s, { type: Platform.TYPES.SOLID });
-  }
-
   addPlatformBody(x, y, width, height, options = {}) {
     const platform = new Platform(this, x, y, width, height, options);
     this.platforms.add(platform.getPhysicsTarget());
@@ -341,10 +397,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   createCharacter() {
-    const playerState = unit_manager.info.players[unit_manager.my_id] || {
-      id: unit_manager.my_id
-    };
-    this.character = new Character(this, playerState.x, playerState.y, {
+    const playerState = unit_manager.info.players[unit_manager.my_id] || { id: unit_manager.my_id };
+
+    // Используем динамический спавн
+    const startX = playerState.x ?? this.spawnPoint.x;
+    const startY = playerState.y ?? this.spawnPoint.y;
+
+    this.character = new Character(this, startX, startY, {
       showStats: true,
       nickname: playerState.username || 'Player'
     });
@@ -367,13 +426,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   createEnemiesBot() {
-    this.enemiesBot = ENEMY_SPAWNS.map((spawn) => {
+    this.enemiesBot = this.enemySpawns.map((spawn) => {
       const enemyState = unit_manager.info.enemies[spawn.id];
       const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
 
-      if (typeof enemyState?.hp === 'number') {
-        enemy.setHp(enemyState.hp);
-      }
+      if (typeof enemyState?.hp === 'number') enemy.setHp(enemyState.hp);
 
       unit_manager.info.enemies[spawn.id] = {
         id: spawn.id,
@@ -391,10 +448,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   updateEnemiesBot(time, delta) {
-    if (!this.enemiesBot?.length) {
-      return;
-    }
-
+    if (!this.enemiesBot?.length) return;
     if (!this.character) return;
 
     const attackId = this.character.getAttackId();
@@ -408,26 +462,14 @@ export class MainScene extends Phaser.Scene {
       }
 
       enemy.update(time, delta, this.character);
-
-      if (enemy.isDead()) {
-        return;
-      }
-
-      if (!isPlayerAttacking || attackId === 0) {
-        return;
-      }
+      if (enemy.isDead()) return;
+      if (!isPlayerAttacking || attackId === 0) return;
 
       if (Phaser.Geom.Intersects.RectangleToRectangle(playerAttackBounds, enemy.getPhysicsTarget().getBounds())) {
         const applied = enemy.takeDamage(this.character.getAttackDamage(), attackId);
         if (applied) {
-          unit_manager.info.enemies[enemy.id] = {
-            id: enemy.id,
-            hp: enemy.getHp()
-          };
-          unit_manager.socket.emit('enemyHit', {
-            enemyId: enemy.id,
-            damage: this.character.getAttackDamage()
-          });
+          unit_manager.info.enemies[enemy.id] = { id: enemy.id, hp: enemy.getHp() };
+          unit_manager.socket.emit('enemyHit', { enemyId: enemy.id, damage: this.character.getAttackDamage() });
         }
       }
     });
@@ -446,14 +488,9 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleCharacterDeath() {
-    if (!this.character || this.isReturningToMenu || !this.character.isDead()) {
-      return;
-    }
-
+    if (!this.character || this.isReturningToMenu || !this.character.isDead()) return;
     this.isReturningToMenu = true;
-    if (unit_manager.socket) {
-      unit_manager.socket.emit('playerDied');
-    }
+    if (unit_manager.socket) unit_manager.socket.emit('playerDied');
     this.cameras.main.stopFollow();
 
     // Удаляем из глобального менеджера
@@ -468,15 +505,10 @@ export class MainScene extends Phaser.Scene {
   }
 
   createEnemy() {
-    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, {
-      showStats: true,
-      nickname: 'Player'
-    });
+    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: true, nickname: 'Player' });
     enemy.setDepth(1);
     this.physics.add.collider(
-        enemy.getPhysicsTarget(),
-        this.platforms,
-        undefined,
+        enemy.getPhysicsTarget(), this.platforms, undefined,
         (_characterBody, platform) => enemy.shouldCollideWithPlatform(platform)
     );
     return enemy;
@@ -521,65 +553,37 @@ export class MainScene extends Phaser.Scene {
 
   createDebugButton(x, y, label, onClick) {
     const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95)
-      .setStrokeStyle(2, 0x94a3b8, 0.7)
-      .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
-
-    const text = this.add.text(x, y, label, {
-      fontFamily: 'JungleAdventurer',
-      fontSize: '28px',
-      color: '#f8fafc'
-    }).setOrigin(0.5).setScrollFactor(0);
-
-    button
-      .on('pointerover', () => button.setFillStyle(0x475569, 0.98))
-      .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
-      .on('pointerdown', onClick);
-
+      .setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+    const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' })
+      .setOrigin(0.5).setScrollFactor(0);
+    button.on('pointerover', () => button.setFillStyle(0x475569, 0.98))
+          .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
+          .on('pointerdown', onClick);
     return { button, label: text };
   }
 
   drawPlatform(graphics, x, y, width, height, soilColor, grassColor) {
-    const s = WORLD_SCALE;
-
     graphics.fillStyle(soilColor, 1);
-    graphics.fillRoundedRect(x, y, width, height, 18 * s);
-
+    graphics.fillRoundedRect(x, y, width, height, 18);
     graphics.fillStyle(grassColor, 1);
-    graphics.fillRoundedRect(x, y - 10 * s, width, 24 * s, 12 * s);
-
+    graphics.fillRoundedRect(x, y - 10, width, 24, 12);
     graphics.fillStyle(0x000000, 0.08);
-    graphics.fillRoundedRect(x + 14 * s, y + 18 * s, width - 28 * s, height - 30 * s, 14 * s);
+    graphics.fillRoundedRect(x + 14, y + 18, width - 28, height - 30, 14);
   }
 
-  createBlackHole(position = {x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE}){
+  createBlackHole(position) {
     this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
     this.animHole.setScale(0.5);
 
-    this.blackHoleZone = this.add.zone(
-      this.animHole.x - 35 * WORLD_SCALE,
-      this.animHole.y - 15 * WORLD_SCALE,
-      80 * WORLD_SCALE,
-      50 * WORLD_SCALE
-    );
-
+    this.blackHoleZone = this.add.zone(this.animHole.x - 35 * WORLD_SCALE, this.animHole.y - 15 * WORLD_SCALE, 80 * WORLD_SCALE, 50 * WORLD_SCALE);
     this.physics.add.existing(this.blackHoleZone);
 
     this.blackHoleZone.body.setAllowGravity(false);
     this.blackHoleZone.body.setImmovable(true);
 
-    this.physics.add.collider(
-      this.character.getPhysicsTarget(),
-      this.platforms
-    );
-
-    this.physics.add.overlap(
-      this.character.getPhysicsTarget(),
-      this.blackHoleZone,
-      this.onBlackHoleTouch,
-      null,
-      this
-    );
+    if (this.character) {
+        this.physics.add.overlap(this.character.getPhysicsTarget(), this.blackHoleZone, this.onBlackHoleTouch, null, this);
+    }
   }
 
   onBlackHoleTouch(characterBody, holeZone) {
@@ -631,7 +635,6 @@ export class MainScene extends Phaser.Scene {
 
   addHeartToRandomPos(){
     let heart;
-    this.positionsForHeart = [{x: 1400 * WORLD_SCALE, y: 580 * WORLD_SCALE, active: false}, {x: 1700 * WORLD_SCALE, y: 470 * WORLD_SCALE, active: false}, {x: 1800 * WORLD_SCALE, y: 230 * WORLD_SCALE, active: false}, {x: 1100 * WORLD_SCALE, y: 420 * WORLD_SCALE, active: false}, {x: 820 * WORLD_SCALE, y: 240 * WORLD_SCALE, active: false}, {x: 760 * WORLD_SCALE, y: 490 * WORLD_SCALE, active: false}, {x: 360 * WORLD_SCALE, y: 410 * WORLD_SCALE, active: false}]
     const freePositions = this.positionsForHeart.filter(p => !p.active);
     if (freePositions.length > 0) {
         const pos = Phaser.Utils.Array.GetRandom(freePositions);
@@ -658,13 +661,9 @@ export class MainScene extends Phaser.Scene {
     heartZone.body.setAllowGravity(false);
     heartZone.body.setImmovable(true);
 
-    this.physics.add.overlap(
-      this.character.getPhysicsTarget(),
-      heartZone,
-      this.onHeartTouch.bind(this, heart, heartZone),
-      null,
-      this
-    );
+    if (this.character) {
+      this.physics.add.overlap(this.character.getPhysicsTarget(), heartZone, this.onHeartTouch.bind(this, heart, heartZone), null, this);
+    }
   }
 
   onHeartTouch(heart, heartZone){

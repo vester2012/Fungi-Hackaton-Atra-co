@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mad Animals | Pro Level Editor</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: #1e293b;
+            --accent: #f59e0b; 
+            --accent-hover: #fbbf24;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --select-color: #eab308;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-dark); color: var(--text-main);
+            display: flex; height: 100vh; overflow: hidden;
+            user-select: none;
+        }
+
+        /* UI Toolbar */
+        .toolbar {
+            width: 320px; background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; z-index: 10;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+            overflow-y: auto;
+        }
+
+        .header { padding: 20px; border-bottom: 1px solid var(--border); }
+        .header h1 { margin: 0; font-size: 1.4rem; color: var(--accent); text-transform: uppercase;}
+        .header p { margin: 5px 0 0; font-size: 0.8rem; color: var(--text-muted); }
+
+        .section { padding: 15px 20px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+        .tool-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        
+        .tool-btn {
+            background: #0f172a; border: 1px solid var(--border);
+            color: var(--text-main); padding: 10px; border-radius: 6px;
+            cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px;
+            transition: 0.1s; font-size: 0.9rem;
+        }
+        .tool-btn:hover { border-color: #64748b; }
+        .tool-btn.active { background: #1e293b; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+        .icon { width: 16px; height: 16px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;}
+        .ic-select { background: #f8fafc; color: #0f172a; }
+        .ic-solid { background: #cbd5e1; border: 2px solid #475569; }
+        .ic-drop { background: #475569; border: 2px dashed #94a3b8; }
+        .ic-spawn { background: #3b82f6; border-radius: 50%; }
+        .ic-enemy { background: #ef4444; }
+        .ic-heart { background: #ec4899; border-radius: 50%; }
+        .ic-hole { background: #8b5cf6; border-radius: 50%; box-shadow: 0 0 5px #a78bfa; }
+        .ic-wall-l { background: #d946ef; border-left: 4px solid #fdf4ff; }
+        .ic-wall-r { background: #d946ef; border-right: 4px solid #fdf4ff; }
+
+        .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.9rem; }
+        .settings-row input[type="number"] { width: 60px; background: #0f172a; border: 1px solid var(--border); color: white; padding: 4px; border-radius: 4px; }
+        .settings-row input[type="checkbox"] { cursor: pointer; }
+
+        .actions { padding: 20px; display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+        .btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: center; font-size: 0.9rem; }
+        .btn-primary { background: var(--accent); color: #0f172a; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-secondary { background: transparent; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--text-main); }
+        #fileInput { display: none; }
+
+        /* Canvas Area */
+        .workspace { flex: 1; position: relative; overflow: hidden; background: #0b0f19; cursor: crosshair; outline: none; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .instructions {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(15, 23, 42, 0.85); padding: 15px;
+            border-radius: 8px; border: 1px solid var(--border);
+            font-size: 0.85rem; color: #cbd5e1; pointer-events: none;
+            line-height: 1.4;
+        }
+        .instructions span { color: var(--accent); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="header">
+        <h1>Mad Animals</h1>
+        <p>Brawlhalla-style Level Editor</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Основное</div>
+        <div class="tool-grid">
+            <button class="tool-btn active" data-tool="select"><div class="icon ic-select">↗</div> Выбрать / Переместить</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Платформы и Зоны</div>
+        <div class="tool-grid">
+            <button class="tool-btn" data-tool="solid"><div class="icon ic-solid"></div> Твердая платформа</button>
+            <button class="tool-btn" data-tool="drop-through"><div class="icon ic-drop"></div> Сквозная платформа</button>
+            <button class="tool-btn" data-tool="wall-slide-l"><div class="icon ic-wall-l"></div> Wall Slide (Слева = -1)</button>
+            <button class="tool-btn" data-tool="wall-slide-r"><div class="icon ic-wall-r"></div> Wall Slide (Справа = 1)</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Объекты (Точки)</div>
+        <div class="tool-grid">
+            <button class="tool-btn" data-tool="spawn"><div class="icon ic-spawn"></div> Спавн Игрока</button>
+            <button class="tool-btn" data-tool="enemy"><div class="icon ic-enemy"></div> Спавн Врага</button>
+            <button class="tool-btn" data-tool="heart"><div class="icon ic-heart"></div> Лечилка (Heart)</button>
+            <button class="tool-btn" data-tool="hole"><div class="icon ic-hole"></div> Черная Дыра</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Настройки Мира</div>
+        <div class="settings-row">
+            <label>Привязка к сетке (Snap)</label>
+            <input type="checkbox" id="snapGrid" checked>
+        </div>
+        <div class="settings-row">
+            <label>Размер ячейки</label>
+            <input type="number" id="gridSize" value="32" step="8">
+        </div>
+        <div class="settings-row">
+            <label>Ширина мира</label>
+            <input type="number" id="worldW" value="3840" step="100">
+        </div>
+        <div class="settings-row">
+            <label>Высота мира</label>
+            <input type="number" id="worldH" value="2160" step="100">
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-primary" onclick="exportJSON()">Экспорт в JSON</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Импорт из JSON</button>
+        <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)">
+    </div>
+</div>
+
+<div class="workspace" tabindex="0" id="workspace">
+    <canvas id="canvas"></canvas>
+    <div class="instructions">
+        <span>Режим 'Выбрать':</span> Тащить за центр = Двигать. За угол = Ресайз.<br>
+        ЛКМ: <span>Рисовать / Выделять</span><br>
+        ПКМ / Клавиша Del: <span>Удалить объект</span><br>
+        СКМ (Колесико) / Alt+ЛКМ: <span>Перемещение камеры</span><br>
+        Scroll: <span>Масштаб</span>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const workspace = document.getElementById('workspace');
+    
+    const toolBtns = document.querySelectorAll('.tool-btn');
+    const snapCheckbox = document.getElementById('snapGrid');
+    const gridSizeInput = document.getElementById('gridSize');
+    const worldWInput = document.getElementById('worldW');
+    const worldHInput = document.getElementById('worldH');
+
+    // Состояние редактора
+    let state = {
+        tool: 'select',
+        camera: { x: 0, y: 0, zoom: 0.3 },
+        map: { platforms: [], points:[] }
+    };
+
+    // Состояние выделения и перетаскивания
+    let selection = {
+        item: null,          // Ссылка на объект
+        type: null,          // 'platform' или 'point'
+        isDragging: false,
+        isResizing: false,
+        offsetX: 0, offsetY: 0
+    };
+
+    let input = {
+        isDrawing: false, isPanning: false,
+        startX: 0, startY: 0,
+        currentX: 0, currentY: 0,
+        lastMouseX: 0, lastMouseY: 0
+    };
+
+    // Адаптивность Canvas
+    function resize() {
+        canvas.width = workspace.clientWidth;
+        canvas.height = workspace.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Смена инструмента
+    toolBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            toolBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.tool = btn.dataset.tool;
+            canvas.style.cursor = state.tool === 'select' ? 'default' : 'crosshair';
+            
+            // Сброс выделения при смене тулзы
+            selection.item = null;
+            selection.isDragging = false;
+            selection.isResizing = false;
+            draw();
+        });
+    });
+
+    // Утилиты
+    function screenToWorld(sx, sy) {
+        return {
+            x: (sx - canvas.width / 2) / state.camera.zoom - state.camera.x,
+            y: (sy - canvas.height / 2) / state.camera.zoom - state.camera.y
+        };
+    }
+
+    function snap(value) {
+        if (!snapCheckbox.checked) return Math.round(value);
+        const gs = parseInt(gridSizeInput.value) || 32;
+        return Math.round(value / gs) * gs;
+    }
+
+    function generateId() { return Math.random().toString(36).substr(2, 9); }
+
+    // Поиск элемента под курсором
+    function getHitItem(wx, wy) {
+        const handleSize = 16 / state.camera.zoom;
+        const hitRadius = 30 / state.camera.zoom;
+
+        // 1. Проверяем хитбокс ресайза (правый нижний угол) выделенной платформы
+        if (selection.item && selection.type === 'platform') {
+            const p = selection.item;
+            if (wx >= p.x + p.w - handleSize && wx <= p.x + p.w + handleSize &&
+                wy >= p.y + p.h - handleSize && wy <= p.y + p.h + handleSize) {
+                return { item: p, type: 'platform', isHandle: true };
+            }
+        }
+
+        // 2. Проверяем точки (спавны и т.д.)
+        for (let i = state.map.points.length - 1; i >= 0; i--) {
+            const p = state.map.points[i];
+            if (Math.hypot(p.x - wx, p.y - wy) < hitRadius) return { item: p, type: 'point' };
+        }
+
+        // 3. Проверяем платформы
+        for (let i = state.map.platforms.length - 1; i >= 0; i--) {
+            const p = state.map.platforms[i];
+            if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h) return { item: p, type: 'platform' };
+        }
+
+        return null;
+    }
+
+    // Удаление
+    function eraseItem(item) {
+        if (!item) return;
+        let idx = state.map.points.indexOf(item);
+        if (idx > -1) state.map.points.splice(idx, 1);
+        
+        idx = state.map.platforms.indexOf(item);
+        if (idx > -1) state.map.platforms.splice(idx, 1);
+
+        if (selection.item === item) selection.item = null;
+        draw();
+    }
+
+    // --- Обработка Мыши ---
+
+    canvas.addEventListener('mousedown', (e) => {
+        workspace.focus(); // Для работы Delete
+
+        // Камера (СКМ или Alt+ЛКМ)
+        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+            input.isPanning = true;
+            input.lastMouseX = e.clientX;
+            input.lastMouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        const worldPos = screenToWorld(e.clientX - canvas.getBoundingClientRect().left, e.clientY - canvas.getBoundingClientRect().top);
+
+        // ПКМ - Удаление
+        if (e.button === 2) {
+            const hit = getHitItem(worldPos.x, worldPos.y);
+            if (hit) eraseItem(hit.item);
+            return;
+        }
+
+        // ЛКМ
+        if (e.button === 0) {
+            // РЕЖИМ ВЫДЕЛЕНИЯ / ПЕРЕМЕЩЕНИЯ
+            if (state.tool === 'select') {
+                const hit = getHitItem(worldPos.x, worldPos.y);
+                if (hit) {
+                    selection.item = hit.item;
+                    selection.type = hit.type;
+                    
+                    if (hit.isHandle) {
+                        selection.isResizing = true;
+                        selection.isDragging = false;
+                    } else {
+                        selection.isDragging = true;
+                        selection.isResizing = false;
+                        selection.offsetX = hit.item.x - worldPos.x;
+                        selection.offsetY = hit.item.y - worldPos.y;
+                    }
+                } else {
+                    selection.item = null;
+                }
+                draw();
+                return;
+            }
+
+            // РЕЖИМ РИСОВАНИЯ НОВЫХ ОБЪЕКТОВ
+            input.isDrawing = true;
+            input.startX = snap(worldPos.x);
+            input.startY = snap(worldPos.y);
+            input.currentX = input.startX;
+            input.currentY = input.startY;
+
+            if (['spawn', 'enemy', 'heart', 'hole'].includes(state.tool)) {
+                state.map.points.push({ id: generateId(), type: state.tool, x: input.startX, y: input.startY });
+                input.isDrawing = false;
+                draw();
+            }
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        
+        if (input.isPanning) {
+            const dx = e.clientX - input.lastMouseX;
+            const dy = e.clientY - input.lastMouseY;
+            state.camera.x += dx / state.camera.zoom;
+            state.camera.y += dy / state.camera.zoom;
+            input.lastMouseX = e.clientX;
+            input.lastMouseY = e.clientY;
+            draw();
+            return;
+        }
+
+        const worldPos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+
+        // Перемещение или Ресайз в режиме SELECT
+        if (state.tool === 'select' && selection.item) {
+            if (selection.isDragging) {
+                selection.item.x = snap(worldPos.x + selection.offsetX);
+                selection.item.y = snap(worldPos.y + selection.offsetY);
+                draw();
+                return;
+            }
+            if (selection.isResizing && selection.type === 'platform') {
+                const newW = snap(worldPos.x - selection.item.x);
+                const newH = snap(worldPos.y - selection.item.y);
+                const minSize = snapCheckbox.checked ? (parseInt(gridSizeInput.value) || 32) : 10;
+                selection.item.w = Math.max(minSize, newW);
+                selection.item.h = Math.max(minSize, newH);
+                draw();
+                return;
+            }
+
+            // Динамический курсор (показываем resize)
+            const handleSize = 16 / state.camera.zoom;
+            const p = selection.item;
+            if (selection.type === 'platform' && 
+                worldPos.x >= p.x + p.w - handleSize && worldPos.x <= p.x + p.w + handleSize &&
+                worldPos.y >= p.y + p.h - handleSize && worldPos.y <= p.y + p.h + handleSize) {
+                canvas.style.cursor = 'nwse-resize';
+            } else {
+                canvas.style.cursor = 'move';
+            }
+        }
+
+        // Рисование новых фигур
+        if (input.isDrawing) {
+            input.currentX = snap(worldPos.x);
+            input.currentY = snap(worldPos.y);
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if (input.isPanning) {
+            input.isPanning = false;
+            canvas.style.cursor = state.tool === 'select' ? 'default' : 'crosshair';
+        }
+
+        if (selection.isDragging || selection.isResizing) {
+            selection.isDragging = false;
+            selection.isResizing = false;
+        }
+
+        if (input.isDrawing) {
+            input.isDrawing = false;
+            const x = Math.min(input.startX, input.currentX);
+            const y = Math.min(input.startY, input.currentY);
+            const w = Math.abs(input.currentX - input.startX);
+            const h = Math.abs(input.currentY - input.startY);
+
+            if (w > 0 && h > 0) {
+                let dir = undefined;
+                if (state.tool === 'wall-slide-l') dir = -1;
+                if (state.tool === 'wall-slide-r') dir = 1;
+
+                const newPlatform = {
+                    id: generateId(),
+                    type: state.tool.replace('-l', '').replace('-r', ''),
+                    x: x, y: y, w: w, h: h,
+                    direction: dir
+                };
+                state.map.platforms.push(newPlatform);
+                
+                // Автовыделение свежесозданной платформы
+                state.tool = 'select';
+                toolBtns.forEach(b => b.classList.toggle('active', b.dataset.tool === 'select'));
+                canvas.style.cursor = 'default';
+                selection.item = newPlatform;
+                selection.type = 'platform';
+            }
+            draw();
+        }
+    });
+
+    // Зум
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
+        state.camera.zoom = Math.max(0.05, Math.min(5, state.camera.zoom * zoomAmount));
+        draw();
+    });
+
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Горячие клавиши
+    workspace.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selection.item) eraseItem(selection.item);
+        }
+    });
+
+    // --- Отрисовка ---
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(state.camera.zoom, state.camera.zoom);
+        ctx.translate(state.camera.x, state.camera.y);
+
+        const wWidth = parseInt(worldWInput.value);
+        const wHeight = parseInt(worldHInput.value);
+
+        // Границы мира
+        ctx.fillStyle = '#132238'; ctx.fillRect(0, 0, wWidth, wHeight);
+        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4 / state.camera.zoom; ctx.strokeRect(0, 0, wWidth, wHeight);
+
+        // Сетка
+        if (snapCheckbox.checked) {
+            const gs = parseInt(gridSizeInput.value) || 32;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1 / state.camera.zoom;
+            ctx.beginPath();
+            for (let x = 0; x <= wWidth; x += gs) { ctx.moveTo(x, 0); ctx.lineTo(x, wHeight); }
+            for (let y = 0; y <= wHeight; y += gs) { ctx.moveTo(0, y); ctx.lineTo(wWidth, y); }
+            ctx.stroke();
+        }
+
+        // Отрисовка объектов
+        state.map.platforms.forEach(p => drawRectEntity(p, p === selection.item));
+        
+        if (input.isDrawing && !['spawn', 'enemy', 'heart', 'hole'].includes(state.tool)) {
+            const x = Math.min(input.startX, input.currentX);
+            const y = Math.min(input.startY, input.currentY);
+            const w = Math.abs(input.currentX - input.startX);
+            const h = Math.abs(input.currentY - input.startY);
+            drawRectEntity({ type: state.tool.replace('-l','').replace('-r',''), x, y, w, h, direction: state.tool.includes('-l') ? -1 : 1 }, false, true);
+        }
+
+        state.map.points.forEach(p => drawPointEntity(p, p === selection.item));
+
+        ctx.restore();
+    }
+
+    function drawRectEntity(p, isSelected = false, isPreview = false) {
+        ctx.globalAlpha = isPreview ? 0.5 : 1;
+        
+        if (p.type === 'solid') {
+            ctx.fillStyle = '#cbd5e1'; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = '#475569'; ctx.lineWidth = 4 / state.camera.zoom; ctx.strokeRect(p.x, p.y, p.w, p.h);
+        } 
+        else if (p.type === 'drop-through') {
+            ctx.fillStyle = '#475569'; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2 / state.camera.zoom; ctx.setLineDash([10 / state.camera.zoom, 10 / state.camera.zoom]);
+            ctx.strokeRect(p.x, p.y, p.w, p.h); ctx.setLineDash([]);
+        }
+        else if (p.type === 'wall-slide') {
+            ctx.fillStyle = 'rgba(217, 70, 239, 0.3)'; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.strokeStyle = '#fdf4ff'; ctx.lineWidth = 4 / state.camera.zoom;
+            ctx.beginPath();
+            if (p.direction === -1) { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y + p.h); }
+            else { ctx.moveTo(p.x + p.w, p.y); ctx.lineTo(p.x + p.w, p.y + p.h); }
+            ctx.stroke();
+        }
+
+        // Подсветка выделения и ручка для ресайза
+        if (isSelected && !isPreview) {
+            ctx.strokeStyle = 'var(--select-color)'; ctx.lineWidth = 6 / state.camera.zoom;
+            ctx.setLineDash([15 / state.camera.zoom, 15 / state.camera.zoom]);
+            ctx.strokeRect(p.x, p.y, p.w, p.h); ctx.setLineDash([]);
+            
+            // Handle (Ресайз)
+            const handleSize = 12 / state.camera.zoom;
+            ctx.fillStyle = 'var(--select-color)';
+            ctx.fillRect(p.x + p.w - handleSize, p.y + p.h - handleSize, handleSize*2, handleSize*2);
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    function drawPointEntity(p, isSelected = false) {
+        ctx.beginPath();
+        const r = 24;
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        
+        if (p.type === 'spawn') {
+            ctx.fillStyle = '#3b82f6'; ctx.fill();
+        } else if (p.type === 'enemy') {
+            ctx.fillStyle = '#ef4444'; ctx.fillRect(p.x - r, p.y - r, r*2, r*2);
+        } else if (p.type === 'heart') {
+            ctx.fillStyle = '#ec4899'; ctx.fill();
+            ctx.fillStyle = 'white'; ctx.font = `${r}px Arial`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('♥', p.x, p.y+2);
+        } else if (p.type === 'hole') {
+            ctx.fillStyle = '#8b5cf6'; ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, r+10, 0, Math.PI * 2); ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 3 / state.camera.zoom; ctx.stroke();
+        }
+
+        if (isSelected) {
+            ctx.beginPath(); ctx.arc(p.x, p.y, r + 8 / state.camera.zoom, 0, Math.PI*2);
+            ctx.strokeStyle = 'var(--select-color)'; ctx.lineWidth = 4 / state.camera.zoom;
+            ctx.setLineDash([10 / state.camera.zoom, 10 / state.camera.zoom]); ctx.stroke(); ctx.setLineDash([]);
+        }
+    }
+
+    // --- Экспорт / Импорт ---
+
+    function exportJSON() {
+        const exportData = {
+            world: { width: parseInt(worldWInput.value), height: parseInt(worldHInput.value) },
+            platforms: state.map.platforms.map(p => ({
+                type: p.type,
+                centerX: p.x + p.w / 2, // Phaser ожидает центр
+                centerY: p.y + p.h / 2,
+                width: p.w, height: p.h, direction: p.direction
+            })),
+            points: state.map.points.map(p => ({ type: p.type, x: p.x, y: p.y }))
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'level_map.json'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                worldWInput.value = data.world.width; worldHInput.value = data.world.height;
+                
+                state.map.platforms = data.platforms.map(p => ({
+                    id: generateId(), type: p.type,
+                    x: p.centerX - p.width / 2, y: p.centerY - p.height / 2,
+                    w: p.width, h: p.height, direction: p.direction
+                }));
+                state.map.points = data.points.map(p => ({ id: generateId(), type: p.type, x: p.x, y: p.y }));
+
+                state.camera.x = -data.world.width / 2; state.camera.y = -data.world.height / 2;
+                selection.item = null;
+                draw();
+            } catch (err) { alert('Ошибка чтения файла: ' + err.message); }
+        };
+        reader.readAsText(file);
+    }
+
+    // Инит
+    state.camera.x = -parseInt(worldWInput.value)/2;
+    state.camera.y = -parseInt(worldHInput.value)/2;
+    draw();
+</script>
+
+</body>
+</html>
