@@ -6,8 +6,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spine('person_SPO', '../../assets/anim/person.json', '../../assets/anim/person.atlas');
     this.load.spine('blackhole_spine_SPO', '../../assets/anim/blackhole_anim_spine.json', '../../assets/anim/blackhole_anim_spine.atlas');
+    this.load.spine('fish_SPO', '../../assets/anim/fish.json', '../../assets/anim/fish.atlas');
   }
 
   create() {

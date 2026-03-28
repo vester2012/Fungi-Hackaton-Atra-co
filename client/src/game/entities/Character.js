@@ -12,7 +12,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitboxOffsetY = -44;
 
     // Создание хитбокса
-    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
+    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 120, 170, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
     scene.physics.add.existing(this.hitbox);
 
     // Ссылка для ZoneManager
@@ -23,7 +23,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitbox.body.setBounce(0, 0);
     this.hitbox.body.setDragX(1600);
     this.hitbox.body.setMaxVelocity(600, 1200); // Немного увеличил макс. скорость для сочности прыжка
-    this.hitbox.body.setSize(80, 130);
+    this.hitbox.body.setSize(this.hitbox.width, this.hitbox.height);
     this.hitbox.body.setOffset(0, 0);
 
     // Параметры движения
@@ -47,9 +47,9 @@ export class Character extends Phaser.GameObjects.Container {
     this.hp = 100;
     this.baseDamage = 10;
     this.attackCooldownMs = 250;
-    this.attackDurationMs = 120;
+    this.attackDurationMs = 300;
     this.attackRange = 110;
-    this.attackWidth = 90;
+    this.attackWidth = 50;
     this.attackHeight = 80;
     this.lastAttackAt = -this.attackCooldownMs;
     this.attackUntil = 0;
@@ -68,18 +68,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.dropThroughDurationMs = 220;
 
     // Анимации Spine
-    this.anim = scene.add.spine(0, 0, 'person_SPO', 'idle', true);
-    this.anim.setScale(0.15);
+    this.anim = scene.add.spine(0, -90, 'fish_SPO', 'idle', true);
+    this.anim.setScale(0.1);
     this.anim.setMix('run', 'idle', 0.25);
     this.add(this.anim);
 
     if (this.showStats) {
-      this.healthIndicator = new HealthIndicator(scene, 0, -170, {
-        nickname:
-      this.nickname, textOffsetY: 0, barOffsetY: 14,
-        textColor: '#e2e8f0',
-        textStroke: '#0f172a'
-      });
+      this.healthIndicator = new HealthIndicator(scene, 0, -170, {nickname: this.nickname, textOffsetY: 0, barOffsetY: 14, textColor: '#e2e8f0', textStroke: '#0f172a'});
       this.add(this.healthIndicator);
     }
 
@@ -116,10 +111,7 @@ export class Character extends Phaser.GameObjects.Container {
     if (jumpPressed) {
       if (this.wallSlideState.isActive && !isGrounded) {
         const jumpDir = -this.wallSlideState.direction;
-        this.hitbox.body.setVelocity(
-            jumpDir * this.wallJumpForceX,
-            -this.wallJumpForceY
-        );
+        this.hitbox.body.setVelocity(jumpDir * this.wallJumpForceX, -this.wallJumpForceY);
         this.applyFacingDirection(jumpDir);
         this.jumpCount = 1;
         this.wallSlideState.isActive = false;
@@ -259,7 +251,7 @@ export class Character extends Phaser.GameObjects.Container {
 
   playAttackAnimation() {
     this.anim.off('complete');
-    this.anim.play('hit_low');
+    this.anim.play('attack_1');
     this.anim.on('complete', () => {
       this.anim.off('complete');
       this.anim.play('idle', true);
