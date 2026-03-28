@@ -18,17 +18,17 @@ export class MainScene extends Phaser.Scene {
 
     const viewWidth = this.scale.width;
     const viewHeight = this.scale.height;
-    const worldWidth = viewWidth * WORLD_SCALE;
-    const worldHeight = viewHeight * WORLD_SCALE;
+    this.worldWidth = viewWidth * WORLD_SCALE;
+    this.worldHeight = viewHeight * WORLD_SCALE;
 
     this.cameras.main.setBackgroundColor('#132238');
     this.cameras.main.roundPixels = true;
-    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
-    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
-    this.drawBackground(worldWidth, worldHeight);
-    this.drawMap(worldWidth, worldHeight);
-    this.createCollisionMap(worldWidth, worldHeight);
+    this.drawBackground(this.worldWidth, this.worldHeight);
+    this.drawMap(this.worldWidth, this.worldHeight);
+    this.createCollisionMap(this.worldWidth, this.worldHeight);
     this.createCharacter();
     this.createEnemiesBot();
     this.createHud(viewWidth);
@@ -471,6 +471,9 @@ export class MainScene extends Phaser.Scene {
     console.log('Персонаж коснулся черной дыры');
 
     const target = this.character.getPhysicsTarget();
+    
+    const x = Phaser.Math.Between(100, this.worldWidth - 100);
+    const y = Phaser.Math.Between(100, this.worldHeight - 100);
 
     // телепорт
     this.tweens.add({
@@ -485,7 +488,7 @@ export class MainScene extends Phaser.Scene {
       alpha: 0,
       duration: 700,
       onComplete: () => {
-        target.setPosition(180 * WORLD_SCALE, 550 * WORLD_SCALE);
+        target.setPosition(x, y);
         this.character.setAlpha(1);
         this.character.setScale(1);
         this.isBlackHoleTriggered = false;
