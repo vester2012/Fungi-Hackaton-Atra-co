@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "webpack serve --config webpack.config.cjs --mode development",
-    "dev:noopen": "webpack serve --config webpack.config.cjs --mode development --open",
+    "dev:noopen": "webpack serve --config webpack.config.cjs --mode development",
+    "dev": "webpack serve --config webpack.config.cjs --mode development --open",
     "build": "webpack --config webpack.config.cjs --mode production"
   },
   "devDependencies": {
