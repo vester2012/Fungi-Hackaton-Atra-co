@@ -1,4 +1,5 @@
 import {InputManager} from "../managers/InputManager";
+import { HealthIndicator } from "./HealthIndicator.js";
 
 const Phaser = window.Phaser;
 import {unit_manager} from "../unit_manager.js";
@@ -53,15 +54,15 @@ export class Character extends Phaser.GameObjects.Container {
     this.add(this.anim);
 
     if (this.showStats) {
-      this.hpText = scene.add.text(0, -150, '', {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#e2e8f0',
-        stroke: '#0f172a',
-        strokeThickness: 4
-      }).setOrigin(0.5, 1);
-
-      this.add(this.hpText);
+      this.healthIndicator = new HealthIndicator(scene, 0, -170, {
+        textOffsetY: 0,
+        barOffsetY: 14,
+        textColor: '#e2e8f0',
+        textStroke: '#0f172a',
+        barBgColor: 0x0f172a,
+        barStrokeColor: 0x475569
+      });
+      this.add(this.healthIndicator);
     }
 
     this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
@@ -158,11 +159,11 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   syncHpText() {
-    if (!this.showStats || !this.hpText || !this.hitbox) {
+    if (!this.showStats || !this.healthIndicator || !this.hitbox) {
       return;
     }
 
-    this.hpText.setText(`HP ${this.hp}/${this.maxHp}`);
+    this.healthIndicator.updateHp(this.hp, this.maxHp);
   }
 
   syncAttackHitbox() {
@@ -324,9 +325,9 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
-    if (this.hpText) {
-      this.hpText.destroy();
-      this.hpText = null;
+    if (this.healthIndicator) {
+      this.healthIndicator.destroy();
+      this.healthIndicator = null;
     }
 
     if (this.attackHitbox) {

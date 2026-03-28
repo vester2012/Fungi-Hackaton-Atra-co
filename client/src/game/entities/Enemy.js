@@ -1,4 +1,5 @@
 const Phaser = window.Phaser;
+import { HealthIndicator } from "./HealthIndicator.js";
 
 export class Enemy extends Phaser.GameObjects.Container {
   constructor(scene, x, y) {
@@ -29,13 +30,14 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.visual = scene.add.rectangle(0, 0, 66, 106, 0xb91c1c, 0.85).setStrokeStyle(3, 0xfca5a5, 1);
     this.add(this.visual);
 
-    this.hpText = scene.add.text(x, y - 118, '', {
-      fontFamily: 'Arial',
-      fontSize: '18px',
-      color: '#fee2e2',
-      stroke: '#450a0a',
-      strokeThickness: 4
-    }).setOrigin(0.5, 1);
+    this.healthIndicator = new HealthIndicator(scene, x, y, {
+      textOffsetY: 0,
+      barOffsetY: 10,
+      textColor: '#fee2e2',
+      textStroke: '#450a0a',
+      barBgColor: 0x1f2937,
+      barStrokeColor: 0x7f1d1d
+    });
 
     this.attackZone = scene.add.rectangle(x, y - 24, 65, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
   }
@@ -67,8 +69,10 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   syncHpText() {
-    this.hpText.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y - this.hitbox.height * 0.5 - 14));
-    this.hpText.setText(`HP ${this.hp}/${this.maxHp}`);
+    const textX = Math.round(this.hitbox.x);
+    const textY = Math.round(this.hitbox.y - this.hitbox.height * 0.5 - 14);
+    this.healthIndicator.setPosition(textX, textY - 20);
+    this.healthIndicator.updateHp(this.hp, this.maxHp);
   }
 
   canAttackPlayer(player) {
@@ -147,9 +151,9 @@ export class Enemy extends Phaser.GameObjects.Container {
       this.damageFlashTimer = null;
     }
 
-    if (this.hpText) {
-      this.hpText.destroy();
-      this.hpText = null;
+    if (this.healthIndicator) {
+      this.healthIndicator.destroy();
+      this.healthIndicator = null;
     }
 
     if (this.attackZone) {
