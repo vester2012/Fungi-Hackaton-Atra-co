@@ -43,8 +43,8 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.attackZone = scene.add.rectangle(x, y - 24, 65, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
   }
 
-  update(player) {
-    if (!this.hitbox) {
+  update(time, delta, player) {
+    if (!this.hitbox || !this.hitbox.body) {
       return;
     }
 
@@ -53,51 +53,52 @@ export class Enemy extends Phaser.GameObjects.Container {
       this.facingDirection = playerBody.x >= this.hitbox.x ? 1 : -1;
     }
 
-    this.syncAttackZone();
+    this.syncAttackZone(time);
     this.syncHpText();
-    this.visual.setFillStyle(this.isAttacking() ? 0xf97316 : 0xb91c1c, this.isAttacking() ? 1 : 0.85);
+
+    // Плавная смена цвета через lerp или delta (опционально),
+    // но сейчас просто завяжем на системное время
+    this.visual.setFillStyle(this.isAttacking(time) ? 0xf97316 : 0xb91c1c, this.isAttacking(time) ? 1 : 0.85);
+
     this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
 
-    if (player && this.canAttackPlayer(player)) {
-      this.tryAttack(player);
+    if (player && this.canAttackPlayer(time, player)) {
+      this.tryAttack(time, player);
     }
   }
 
-  syncAttackZone() {
-    const offsetX = (this.hitbox.width * 0.5 + this.attackZone.width * 0.5) * this.facingDirection;
-    this.attackZone.setPosition(Math.round(this.hitbox.x + offsetX), Math.round(this.hitbox.y - 6));
-    this.attackZone.setFillStyle(0xf59e0b, this.isAttacking() ? 0.26 : 0.14);
-  }
-
+  // ВОТ ЭТОТ МЕТОД БЫЛ УТЕРЯН
   syncHpText() {
+    if (!this.healthIndicator || !this.hitbox) return;
     const textX = Math.round(this.hitbox.x);
     const textY = Math.round(this.hitbox.y - this.hitbox.height * 0.5 - 14);
     this.healthIndicator.setPosition(textX, textY - 20);
     this.healthIndicator.updateHp(this.hp, this.maxHp);
   }
 
-  canAttackPlayer(player) {
-    const now = this.scene.time.now;
+  syncAttackZone(time) {
+    const offsetX = (this.hitbox.width * 0.5 + this.attackZone.width * 0.5) * this.facingDirection;
+    this.attackZone.setPosition(Math.round(this.hitbox.x + offsetX), Math.round(this.hitbox.y - 6));
+    this.attackZone.setFillStyle(0xf59e0b, this.isAttacking(time) ? 0.26 : 0.14);
+  }
 
-    if (now - this.lastAttackAt < this.attackCooldownMs) {
-      return false;
-    }
+  isAttacking(time) {
+    const now = time ?? this.scene.time.now;
+    return now < this.attackUntil;
+  }
 
+  canAttackPlayer(time, player) {
+    if (time - this.lastAttackAt < this.attackCooldownMs) return false;
     return Phaser.Geom.Intersects.RectangleToRectangle(
       this.attackZone.getBounds(),
       player.getPhysicsTarget().getBounds()
     );
   }
 
-  tryAttack(player) {
-    const now = this.scene.time.now;
+  tryAttack(time, player) {
+    this.lastAttackAt = time;
+    this.attackUntil = time + this.attackDurationMs;
 
-    if (now - this.lastAttackAt < this.attackCooldownMs) {
-      return false;
-    }
-
-    this.lastAttackAt = now;
-    this.attackUntil = now + this.attackDurationMs;
     player.takeDamage(this.baseDamage);
     if (unit_manager.socket && player.getHp) {
       unit_manager.socket.emit('playerDamagedByEnemy', {
@@ -105,49 +106,35 @@ export class Enemy extends Phaser.GameObjects.Container {
         damage: this.baseDamage
       });
     }
-    this.syncAttackZone();
+    this.syncAttackZone(time);
     return true;
   }
 
-  isAttacking() {
-    return this.scene.time.now < this.attackUntil;
-  }
-
   takeDamage(amount, attackId = 0) {
-    if (attackId && this.lastHitByAttackId === attackId) {
-      return false;
-    }
-
-    if (attackId) {
-      this.lastHitByAttackId = attackId;
-    }
+    if (attackId && this.lastHitByAttackId === attackId) return false;
+    if (attackId) this.lastHitByAttackId = attackId;
 
     this.hp = Math.max(0, this.hp - amount);
     this.visual.setFillStyle(0xf87171, 1);
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount, { color: '#fecaca', stroke: '#7f1d1d' });
 
     if (this.damageFlashTimer) {
-      this.damageFlashTimer.remove(false);
+      this.damageFlashTimer.remove();
       this.damageFlashTimer = null;
     }
 
     this.damageFlashTimer = this.scene.time.delayedCall(100, () => {
       this.damageFlashTimer = null;
       if (this.visual) {
-        this.visual.setFillStyle(this.isAttacking() ? 0xf97316 : 0xb91c1c, this.isAttacking() ? 1 : 0.85);
+        this.visual.setFillStyle(this.isAttacking(this.scene.time.now) ? 0xf97316 : 0xb91c1c, 0.85);
       }
     });
 
     return true;
   }
 
-  getPhysicsTarget() {
-    return this.hitbox;
-  }
-
-  getHp() {
-    return this.hp;
-  }
+  getPhysicsTarget() { return this.hitbox; }
+  getHp() { return this.hp; }
 
   setHp(nextHp) {
     this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
@@ -155,29 +142,16 @@ export class Enemy extends Phaser.GameObjects.Container {
     return this.hp;
   }
 
-  isDead() {
-    return this.hp <= 0;
-  }
+  isDead() { return this.hp <= 0; }
 
   destroy(fromScene) {
-    if (this.damageFlashTimer) {
-      this.damageFlashTimer.remove(false);
-      this.damageFlashTimer = null;
-    }
-
-    if (this.healthIndicator) {
-      this.healthIndicator.destroy();
-      this.healthIndicator = null;
-    }
-
-    if (this.attackZone) {
-      this.attackZone.destroy();
-      this.attackZone = null;
-    }
+    if (this.damageFlashTimer) this.damageFlashTimer.remove();
+    if (this.healthIndicator) this.healthIndicator.destroy();
+    if (this.attackZone) this.attackZone.destroy();
 
     if (this.hitbox) {
+      this.scene.physics.world.disableBody(this.hitbox.body);
       this.hitbox.destroy();
-      this.hitbox = null;
     }
 
     super.destroy(fromScene);

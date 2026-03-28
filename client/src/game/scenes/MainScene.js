@@ -104,9 +104,9 @@ export class MainScene extends Phaser.Scene {
 
     // И так далее. Теперь ты можешь навешивать WallSlideZone поверх любых стен!
   }
-  update() {
+  update(time, delta) {
     if (this.character) {
-      this.character.update();
+      this.character.update(time, delta);
       const {x, y} = this.character;
       const playerState = unit_manager.info.players[unit_manager.my_id] || {
         id: unit_manager.my_id
@@ -118,27 +118,33 @@ export class MainScene extends Phaser.Scene {
       unit_manager.info.players[unit_manager.my_id] = playerState;
 
       unit_manager.socket.emit('playerMovement', {
-        x,
-        y,
+        x: this.character.x,
+        y: this.character.y,
         hp: this.character.getHp()
       });
     }
 
     this.handleCharacterDeath();
-    this.updateEnemiesBot();
-    this.updateEnemysPlayers();
-    this.updateHud();
-    this.updateSocketInfo();
+    this.updateEnemiesBot(time, delta);
+    this.updateEnemysPlayers(time, delta);
+    this.updateHud(time, delta);
+    this.updateSocketInfo(time, delta);
   }
 
-  updateEnemysPlayers() {
+  updateEnemysPlayers(time, delta) {
     let players = unit_manager.info.players;
-    for (const [key, value] of Object.entries(players)) {
-      if(value.id !== unit_manager.my_id) {
-        if (!value.obj) value.obj = this.createEnemy();
-        value.obj.applyRemoteState(value.x, value.y, this.time.now);
-        if (typeof value.hp === 'number') {
-          value.obj.setHp(value.hp);
+    for (const [id, data] of Object.entries(players)) {
+      if(id !== unit_manager.my_id) {
+        if (!data.obj) data.obj = this.createEnemy();
+
+        // Передаем time в applyRemoteState если там есть логика анимаций
+        data.obj.applyRemoteState(data.x, data.y, time);
+
+        if (typeof data.hp === 'number') data.obj.setHp(data.hp);
+
+        if (data.pendingAttackId && data.pendingAttackId !== data.lastPlayedAttackId) {
+          data.lastPlayedAttackId = data.pendingAttackId;
+          data.obj.playRemoteAttack(time);
         }
         if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
           value.lastPlayedAttackId = value.pendingAttackId;
@@ -379,8 +385,8 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  updateEnemiesBot() {
-    if (!this.enemiesBot?.length || !this.character) {
+  updateEnemiesBot(time, delta) {
+    if (!this.enemiesBot?.length) {
       return;
     }
 
@@ -394,7 +400,7 @@ export class MainScene extends Phaser.Scene {
         enemy.setHp(enemyState.hp);
       }
 
-      enemy.update(this.character);
+      enemy.update(time, delta, this.character);
 
       if (enemy.isDead()) {
         return;
@@ -419,14 +425,15 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    this.enemiesBot = this.enemiesBot.filter((enemy) => {
-      if (!enemy.isDead()) {
-        return true;
-      }
-
-      enemy.destroy();
-      return false;
-    });
+    // Фильтрация и очистка
+    for (let i = this.enemiesBot.length - 1; i >= 0; i--) {
+        if (this.enemiesBot[i].isDead()) {
+            const enemy = this.enemiesBot[i];
+            delete unit_manager.info.enemies[enemy.id]; // Очищаем ссылку в менеджере!
+            enemy.destroy();
+            this.enemiesBot.splice(i, 1);
+        }
+    }
   }
 
   handleCharacterDeath() {
@@ -439,6 +446,12 @@ export class MainScene extends Phaser.Scene {
       unit_manager.socket.emit('playerDied');
     }
     this.cameras.main.stopFollow();
+
+    // Удаляем из глобального менеджера
+    if (unit_manager.info.players[unit_manager.my_id]) {
+        unit_manager.info.players[unit_manager.my_id].obj = null;
+    }
+
     this.character.destroy();
     this.character = null;
     this.scene.start('MenuScene');
