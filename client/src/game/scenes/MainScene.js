@@ -7,6 +7,7 @@ import {MobileUI} from "../ui/MobileUI";
 import {WallSlideZone} from "../systems/WallSlideZone";
 import {ZoneManager} from "../systems/ZoneManager";
 import {utils} from "../utils.js";
+import {ParallaxBackground} from "../systems/ParallaxBackground";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -53,10 +54,11 @@ export class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
-    this.drawBackground(this.worldWidth, this.worldHeight);
+    // this.drawBackground(this.worldWidth, this.worldHeight);
 
     this.platforms = this.physics.add.staticGroup();
     this.zoneManager = new ZoneManager(this);
+    this.parallax = new ParallaxBackground(this, 'sky_layer_', 8);
 
     // ПОСТРОЕНИЕ УРОВНЯ
     if (levelData) {
@@ -252,6 +254,7 @@ export class MainScene extends Phaser.Scene {
         y: this.character.y,
         hp: this.character.getHp()
       });
+      this.parallax.update(this.cameras.main);
     }
 
     this.handleCharacterDeath();
