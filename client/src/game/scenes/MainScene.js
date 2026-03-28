@@ -3,6 +3,7 @@ import { Enemy } from '../entities/Enemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
+import {utils} from "../utils.js";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -79,23 +80,24 @@ export class MainScene extends Phaser.Scene {
 
     this.handleCharacterDeath();
     this.updateEnemiesBot();
+    this.updateEnemysPlayers();
     this.updateHud();
     this.updateSocketInfo();
-    this.updateEnemys();
-
   }
 
-  updateEnemys() {
+  updateEnemysPlayers() {
     let players = unit_manager.info.players;
     for (const [key, value] of Object.entries(players)) {
       if(value.id !== unit_manager.my_id) {
         if (!value.obj) value.obj = this.createEnemy();
         value.obj.applyRemoteState(value.x, value.y, this.time.now);
 
-        if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
-          value.lastPlayedAttackId = value.pendingAttackId;
-          value.obj.playRemoteAttack(this.time.now);
-        }
+
+        // if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
+        //   value.lastPlayedAttackId = value.pendingAttackId;
+        //   value.obj.playRemoteAttack(this.time.now);
+        //   this.getCollisionAttack();
+        // }
       }
     }
   }
@@ -115,6 +117,50 @@ export class MainScene extends Phaser.Scene {
     } else {
       this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
     }
+  }
+
+  checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.w &&
+        rect1.x + rect1.w > rect2.x &&
+        rect1.y < rect2.y + rect2.h &&
+        rect1.y + rect1.h > rect2.y;
+  }
+
+  getCollisionAttack() {
+    // 1. Собираем массив врагов (все кроме себя)
+    let otherPlayers = utils.parsePlayersToArray(unit_manager.info.players)
+        .filter(el => el.id !== unit_manager.my_id);
+
+    // 2. Определяем хитбокс атаки в мировых координатах
+    let attackRect = {
+      x: //this.character.x +
+          this.character.attackHitbox.x,
+      y: //this.character.y +
+          this.character.attackHitbox.y,
+      w: this.character.attackHitbox.width, // ширина зоны удара
+      h: this.character.attackHitbox.height  // высота зоны удара
+    };
+
+    otherPlayers.forEach(player => {
+      // Предположим, что у каждого игрока в объекте есть хитбокс с x, y, w, h
+      // Важно: x и y врага тоже должны быть мировыми координатами!
+      let enemyHitbox = {
+        x: player.obj.hitbox.x,
+        y: player.obj.hitbox.y,
+        w: player.obj.hitbox.width,
+        h: player.obj.hitbox.height
+      };
+
+      if (this.checkCollision(attackRect, enemyHitbox)) {
+        console.log("Попал по игроку:", player.id);
+
+        // 3. Сообщаем серверу, что мы нанесли урон
+        unit_manager.socket.emit('playerHit', {
+          targetId: player.id,
+          damage: 10
+        });
+      }
+    });
   }
 
   drawBackground(width, height) {
@@ -238,6 +284,10 @@ export class MainScene extends Phaser.Scene {
       undefined,
       (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
     );
+
+    this.character.events.on('attack', () => {
+      this.getCollisionAttack();
+    })
   }
 
   createEnemiesBot() {

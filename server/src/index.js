@@ -76,6 +76,31 @@ io.on('connection', (socket) => {
     delete players[socket.id];
     io.emit('playerDisconnected', socket.id);
   });
+
+  // Внутри io.on('connection', (socket) => { ... })
+
+  socket.on('playerHit', (data) => {
+    const targetId = data.targetId;
+    const damage = data.damage;
+
+    if (players[targetId]) {
+      // Уменьшаем HP на сервере
+      players[targetId].hp -= damage;
+
+      if (players[targetId].hp <= 0) {
+        players[targetId].hp = 0;
+        // Можно добавить логику смерти / респауна
+        console.log(`Игрок ${targetId} погиб`);
+      }
+
+      // Рассылаем ВСЕМ новое состояние здоровья этого игрока
+      io.emit('hpUpdate', {
+        id: targetId,
+        hp: players[targetId].hp,
+        attackerId: socket.id // опционально: кто ударил
+      });
+    }
+  });
 });
 
 // Все запросы, которые не обработаны иначе, отдают index.html из dist

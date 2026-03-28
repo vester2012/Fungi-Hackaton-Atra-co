@@ -67,6 +67,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
 
     this.syncHpText();
+    this.events = new Phaser.Events.EventEmitter();
   }
 
   update() {
@@ -209,6 +210,8 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackUntil = now + this.attackDurationMs;
     this.attackId += 1;
     this.syncAttackHitbox();
+
+    this.events.emit('attack');
 
     if (unit_manager.socket) {
       unit_manager.socket.emit('playerAttack', { attackId: this.attackId });

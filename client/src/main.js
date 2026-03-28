@@ -13,8 +13,6 @@ async function startGame() {
 
 startGame();
 
-
-
 //* SOCKET *//
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -53,6 +51,21 @@ socket.on('playerAttacked', (attackInfo) => {
 // Удаление вышедшего игрока
 socket.on('playerDisconnected', (playerId) => {
     delete players[playerId];
+});
+
+socket.on('hpUpdate', (data) => {
+    // Находим игрока в нашем локальном списке и обновляем его HP
+    if (players[data.id]) {
+        //players[data.id].hp = data.hp;
+        players[data.id].newHP = data.hp;//сделал чтобы потом вызвать евент
+
+        // Визуальное отображение (например, отнять полоску HP)
+        console.log(`У игрока ${data.id} осталось ${data.hp} HP`);
+
+        if (data.hp <= 0) {
+            // Анимация смерти или скрытие модели
+        }
+    }
 });
 
 
