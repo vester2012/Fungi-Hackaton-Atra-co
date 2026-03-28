@@ -12,6 +12,14 @@ export class MenuScene extends Phaser.Scene {
 
     this.load.image('heart', '../../assets/heart.png');
 
+    this.load.audio('jump', ['assets/audio/ma-jump.mp3', 'assets/audio/ma-jump.ogg']);
+    this.load.audio('jump1', ['assets/audio/ma-jump1.mp3', 'assets/audio/ma-jump1.ogg']);
+    this.load.audio('jump2', ['assets/audio/ma-jump2.mp3', 'assets/audio/ma-jump2.ogg']);
+    this.load.audio('jump3', ['assets/audio/ma-jump3.mp3', 'assets/audio/ma-jump3.ogg']);
+    this.load.audio('kick', ['assets/audio/ma-kick.mp3', 'assets/audio/ma-kick.ogg']);
+    this.load.audio('kick1', ['assets/audio/ma-kick1.mp3', 'assets/audio/ma-kick1.ogg']);
+    this.load.audio('bg-music', ['assets/audio/bg-music.mp3', 'assets/audio/bg-music.ogg']);
+
   }
 
   create() {
@@ -59,6 +67,17 @@ export class MenuScene extends Phaser.Scene {
 
     this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, 'Button 3', 0x334155, () => {
       statusText.setText('click button 3');
+    });
+
+    this.input.once('pointerdown', () => {
+      if (!this.bgMusic) {
+        this.bgMusic = this.sound.add('bg-music', {
+          loop: true,
+          volume: 0.3
+        });
+
+        this.bgMusic.play();
+      }
     });
   }
 

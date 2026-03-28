@@ -120,9 +120,11 @@ export class Character extends Phaser.GameObjects.Container {
         this.applyFacingDirection(jumpDir);
         this.jumpCount = 1;
         this.wallSlideState.isActive = false;
+        this.playJumpSound();
       } else if (this.jumpCount < this.maxJumps) {
         this.hitbox.body.setVelocityY(-this.jumpSpeed);
         this.jumpCount += 1;
+        this.playJumpSound();
       }
     }
 
@@ -158,6 +160,7 @@ export class Character extends Phaser.GameObjects.Container {
 
     if (attackPressed) {
       if (this.tryAttack(now)) {
+        this.playKickSound();
         this.playAttackAnimation(movingHorizontally && isGrounded);
       }
     }
@@ -281,6 +284,29 @@ export class Character extends Phaser.GameObjects.Container {
       this.currentAnimation = '';
     });
   }
+
+  playJumpSound() {
+    const jumpSoundKeys = ['jump', 'jump1', 'jump2', 'jump3'];
+
+    if (this.scene.sound.locked) {
+      return;
+    }
+
+    const key = Phaser.Utils.Array.GetRandom(jumpSoundKeys);
+    this.scene.sound.play(key, { volume: 0.1 });
+  }
+
+  playKickSound() {
+    const kickSoundKeys = ['kick', 'kick1'];
+
+    if (this.scene.sound.locked) {
+      return;
+    }
+
+    const key = Phaser.Utils.Array.GetRandom(kickSoundKeys);
+    this.scene.sound.play(key, { volume: 0.2 });
+  }
+
 
   applyRemoteState(x, y, now = this.scene.time.now) {
     const movedX = x - this.x;
