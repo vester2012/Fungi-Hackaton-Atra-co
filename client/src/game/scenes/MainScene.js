@@ -78,6 +78,18 @@ export class MainScene extends Phaser.Scene {
     this.updateEnemies();
     this.updateHud();
     this.updateSocketInfo();
+    this.updateEnemys();
+
+  }
+
+  updateEnemys() {
+    let players = unit_manager.info.players;
+    for (const [key, value] of Object.entries(players)) {
+      if(value.id !== unit_manager.my_id) {
+        if (!value.obj) value.obj = this.createEnemy();
+        value.obj.setPosition(value.x, value.y);
+      }
+    }
   }
 
   updateSocketInfo() {
@@ -285,6 +297,18 @@ export class MainScene extends Phaser.Scene {
     this.character.destroy();
     this.character = null;
     this.scene.start('MenuScene');
+  }
+
+  createEnemy() {
+    let enemy = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE);
+    enemy.setDepth(1);
+    this.physics.add.collider(
+        enemy.getPhysicsTarget(),
+        this.platforms,
+        undefined,
+        (_characterBody, platform) => enemy.shouldCollideWithPlatform(platform)
+    );
+    return enemy;
   }
 
   createHud(viewWidth) {
