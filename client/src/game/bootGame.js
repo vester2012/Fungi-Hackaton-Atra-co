@@ -1,6 +1,5 @@
 import { MainScene } from './scenes/MainScene.js';
 import { MenuScene } from './scenes/MenuScene.js';
-import { CreateRoomScene } from './scenes/RoomScene.js';
 
 export function bootGame(parent) {
   const Phaser = window.Phaser;
