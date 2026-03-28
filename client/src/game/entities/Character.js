@@ -6,7 +6,8 @@ export class Character extends Phaser.GameObjects.Container {
 
     scene.add.existing(this);
 
-    this.hitbox = scene.add.rectangle(x, y - 44, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
+    this.hitboxOffsetY = -44;
+    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
 
     scene.physics.add.existing(this.hitbox);
 
@@ -33,6 +34,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.attackUntil = 0;
     this.attackId = 0;
     this.facingDirection = 1;
+    this.isSyncingFromHitbox = false;
     this.currentAnimation = 'idle';
     this.lastDownTapAt = 0;
     this.dropThroughUntil = 0;
@@ -107,11 +109,10 @@ export class Character extends Phaser.GameObjects.Container {
       }
     }
 
-    this.syncAttackHitbox();
     if (!this.isAttacking()) {
       this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
     }
-    this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
+    this.syncContainerToHitbox();
   }
   //
   // isMoving() {
@@ -148,6 +149,16 @@ export class Character extends Phaser.GameObjects.Container {
     });
   }
 
+  syncContainerToHitbox() {
+    this.isSyncingFromHitbox = true;
+    super.setPosition(
+      Math.round(this.hitbox.x),
+      Math.round(this.hitbox.y + this.hitbox.height * 0.5)
+    );
+    this.isSyncingFromHitbox = false;
+    this.syncAttackHitbox();
+  }
+
   syncAttackHitbox() {
     const isActive = this.isAttacking();
     const directionOffset = (this.hitbox.width * 0.5 + this.attackWidth * 0.5) * this.facingDirection;
@@ -157,6 +168,18 @@ export class Character extends Phaser.GameObjects.Container {
       Math.round(this.hitbox.y - 8)
     );
     this.attackHitbox.setVisible(isActive);
+  }
+
+  setPosition(x, y, z, w) {
+    super.setPosition(x, y, z, w);
+
+    if (this.isSyncingFromHitbox || !this.hitbox?.body) {
+      return this;
+    }
+
+    this.hitbox.body.reset(x, y + this.hitboxOffsetY);
+    this.syncAttackHitbox();
+    return this;
   }
 
   tryAttack(now = this.scene.time.now) {
