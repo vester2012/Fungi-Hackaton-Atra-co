@@ -1,13 +1,15 @@
 const Phaser = window.Phaser;
 import { HealthIndicator } from "./HealthIndicator.js";
 import { DamagePopup } from "./DamagePopup.js";
+import { unit_manager } from "../unit_manager.js";
 
 export class Enemy extends Phaser.GameObjects.Container {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, options = {}) {
     super(scene, x, y);
 
     scene.add.existing(this);
 
+    this.id = options.id ?? null;
     this.maxHp = 100;
     this.hp = 100;
     this.baseDamage = 10;
@@ -97,6 +99,12 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.lastAttackAt = now;
     this.attackUntil = now + this.attackDurationMs;
     player.takeDamage(this.baseDamage);
+    if (unit_manager.socket && player.getHp) {
+      unit_manager.socket.emit('playerDamagedByEnemy', {
+        hp: player.getHp(),
+        damage: this.baseDamage
+      });
+    }
     this.syncAttackZone();
     return true;
   }
@@ -138,6 +146,12 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   getHp() {
+    return this.hp;
+  }
+
+  setHp(nextHp) {
+    this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
+    this.syncHpText();
     return this.hp;
   }
 

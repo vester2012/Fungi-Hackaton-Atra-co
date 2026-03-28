@@ -3,6 +3,54 @@ import { io } from "socket.io-client";
 import { bootGame } from './game/bootGame.js';
 import {unit_manager} from "./game/unit_manager.js";
 
+const params = new URLSearchParams(window.location.search);
+const isDebug = params.has('debug');
+
+// if (!import.meta.env.DEV) {
+if (true) {
+    console.log(
+        '%cStop!',
+        'color: red; font-size: 32px; font-weight: bold;'
+    );
+
+    console.log(
+        '%cThis is a developer console. Do not paste code here unless you understand it.',
+        'color: crimson; font-size: 14px;'
+    );
+    console.log(`
+   ███████████████████████████████████
+   █  HACKER TERMINAL - ROOT ACCESS  █
+   ███████████████████████████████████
+
+                // | \\
+               ||     ||
+               ||     ||
+                '-----'
+               ||     ||
+               ||     ||
+               ||     ||
+              _||_   _||_
+             /    \\ /    \\
+           |      | |     |
+            \\_____/\\_____/
+`);
+}
+
+if (isDebug) {
+    import('eruda').then((eruda) => {
+        eruda.default.init();
+
+        const entry = document.querySelector('.eruda-entry-btn');
+
+        if (entry) {
+            entry.style.left = 'auto';
+            entry.style.right = '10vw';
+            entry.style.top = '10vh';
+            entry.style.bottom = 'auto';
+        }
+    });
+}
+
 async function startGame() {
     if (document.fonts?.load) {
         await document.fonts.load('16px "JungleAdventurer"');
@@ -28,6 +76,10 @@ socket.on('currentPlayers', (serverPlayers) => {
     Object.assign(players, serverPlayers);
 });
 
+socket.on('currentEnemies', (serverEnemies) => {
+    Object.assign(unit_manager.info.enemies, serverEnemies);
+});
+
 // Новый игрок зашел
 socket.on('newPlayer', (playerInfo) => {
     players[playerInfo.id] = playerInfo;
@@ -38,6 +90,12 @@ socket.on('playerMoved', (playerInfo) => {
     if (players[playerInfo.id]) {
         players[playerInfo.id].x = playerInfo.x;
         players[playerInfo.id].y = playerInfo.y;
+        if (typeof playerInfo.hp === 'number') {
+            players[playerInfo.id].hp = playerInfo.hp;
+            if (players[playerInfo.id].obj?.setHp) {
+                players[playerInfo.id].obj.setHp(playerInfo.hp);
+            }
+        }
     }
 });
 
@@ -49,23 +107,42 @@ socket.on('playerAttacked', (attackInfo) => {
 
 // Удаление вышедшего игрока
 socket.on('playerDisconnected', (playerId) => {
+    if (players[playerId]?.obj?.destroy) {
+        players[playerId].obj.destroy();
+    }
     delete players[playerId];
 });
 
 socket.on('hpUpdate', (data) => {
-    // Находим игрока в нашем локальном списке и обновляем его HP
     if (players[data.id]) {
-        //players[data.id].hp = data.hp;
-        players[data.id].newHP = data.hp;//сделал чтобы потом вызвать евент
+        const previousHp = typeof players[data.id].hp === 'number' ? players[data.id].hp : null;
+        players[data.id].hp = data.hp;
+        if (players[data.id].obj) {
+            const playerObject = players[data.id].obj;
+            const tookDamage = typeof data.damage === 'number'
+                && previousHp !== null
+                && data.hp < previousHp
+                && data.id !== unit_manager.my_id;
 
-        // Визуальное отображение (например, отнять полоску HP)
-        console.log(`У игрока ${data.id} осталось ${data.hp} HP`);
-
-        if (data.hp <= 0) {
-            // Анимация смерти или скрытие модели
+            if (tookDamage && playerObject.applySyncedDamage) {
+                playerObject.applySyncedDamage(data.damage, data.hp);
+            } else if (playerObject.setHp) {
+                playerObject.setHp(data.hp);
+            }
         }
     }
 });
 
+socket.on('enemyHpUpdate', (data) => {
+    if (!unit_manager.info.enemies[data.id]) {
+        unit_manager.info.enemies[data.id] = { id: data.id, hp: data.hp };
+    } else {
+        unit_manager.info.enemies[data.id].hp = data.hp;
+    }
+
+    if (unit_manager.info.enemies[data.id].obj?.setHp) {
+        unit_manager.info.enemies[data.id].obj.setHp(data.hp);
+    }
+});
 
 unit_manager.socket = socket;

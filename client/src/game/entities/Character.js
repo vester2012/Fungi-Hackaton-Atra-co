@@ -294,11 +294,51 @@ export class Character extends Phaser.GameObjects.Container {
     this.syncAttackHitbox();
   }
 
-  isAttacking() { return this.scene.time.now < this.attackUntil; }
-  getAttackDamage() { return this.baseDamage; }
-  getAttackHitbox() { return this.attackHitbox; }
-  getAttackId() { return this.attackId; }
-  isDead() { return this.hp <= 0; }
+  isAttacking() {
+    return this.scene.time.now < this.attackUntil;
+  }
+
+  getAttackDamage() {
+    return this.baseDamage;
+  }
+
+  getAttackHitbox() {
+    return this.attackHitbox;
+  }
+
+  getAttackId() {
+    return this.attackId;
+  }
+
+  getHp() {
+    return this.hp;
+  }
+
+  getMaxHp() {
+    return this.maxHp;
+  }
+
+  setHp(nextHp) {
+    this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
+    this.syncHpText();
+    return this.hp;
+  }
+
+  applySyncedDamage(amount, nextHp = null) {
+    if (typeof nextHp === 'number') {
+      this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
+    } else {
+      this.hp = Math.max(0, this.hp - amount);
+    }
+
+    this.syncHpText();
+    new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
+    return this.hp;
+  }
+
+  isDead() {
+    return this.hp <= 0;
+  }
 
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);

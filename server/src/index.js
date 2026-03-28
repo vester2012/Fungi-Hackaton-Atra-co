@@ -23,6 +23,11 @@ app.use(express.static(PATH_PUBLIC));
 
 // Хранилище игроков
 const players = {};
+const enemies = {
+  'enemy-1': { id: 'enemy-1', hp: 100 },
+  'enemy-2': { id: 'enemy-2', hp: 100 },
+  'enemy-3': { id: 'enemy-3', hp: 100 }
+};
 
 // Socket.IO
 const io = new Server(server, {
@@ -48,6 +53,7 @@ io.on('connection', (socket) => {
 
   // Отправляем текущему игроку список всех остальных
   socket.emit('currentPlayers', players);
+  socket.emit('currentEnemies', enemies);
   // Оповещаем остальных, что зашел новый игрок
   socket.broadcast.emit('newPlayer', players[socket.id]);
 
@@ -57,6 +63,9 @@ io.on('connection', (socket) => {
 
     players[socket.id].x = movementData.x;
     players[socket.id].y = movementData.y;
+    if (typeof movementData.hp === 'number') {
+      players[socket.id].hp = movementData.hp;
+    }
 
     // Рассылаем всем обновленную позицию этого игрока
     socket.broadcast.emit('playerMoved', players[socket.id]);
@@ -101,9 +110,51 @@ io.on('connection', (socket) => {
       io.emit('hpUpdate', {
         id: targetId,
         hp: players[targetId].hp,
-        attackerId: socket.id // опционально: кто ударил
+        attackerId: socket.id,
+        damage
       });
     }
+  });
+
+  socket.on('playerDamagedByEnemy', (data) => {
+    if (!players[socket.id] || typeof data.hp !== 'number') {
+      return;
+    }
+
+    players[socket.id].hp = Math.max(0, data.hp);
+
+    io.emit('hpUpdate', {
+      id: socket.id,
+      hp: players[socket.id].hp,
+      damage: typeof data.damage === 'number' ? data.damage : null
+    });
+  });
+
+  socket.on('playerDied', () => {
+    if (!players[socket.id]) {
+      return;
+    }
+
+    delete players[socket.id];
+    io.emit('playerDisconnected', socket.id);
+  });
+
+  socket.on('enemyHit', (data) => {
+    const enemyId = data.enemyId;
+    const damage = data.damage;
+
+    if (!enemies[enemyId] || typeof damage !== 'number') {
+      return;
+    }
+
+    enemies[enemyId].hp = Math.max(0, enemies[enemyId].hp - damage);
+
+    io.emit('enemyHpUpdate', {
+      id: enemyId,
+      hp: enemies[enemyId].hp,
+      attackerId: socket.id,
+      damage
+    });
   });
 });
 
