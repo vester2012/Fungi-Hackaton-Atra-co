@@ -42,6 +42,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.lastExternalX = x;
     this.isSyncingFromHitbox = false;
     this.showStats = options.showStats ?? true;
+    this.nickname = options.nickname ?? 'Player';
     this.currentAnimation = 'idle';
     this.lastDownTapAt = 0;
     this.dropThroughUntil = 0;
@@ -56,6 +57,7 @@ export class Character extends Phaser.GameObjects.Container {
 
     if (this.showStats) {
       this.healthIndicator = new HealthIndicator(scene, 0, -170, {
+        nickname: this.nickname,
         textOffsetY: 0,
         barOffsetY: 14,
         textColor: '#e2e8f0',

@@ -12,8 +12,17 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     this.barOffsetY = options.barOffsetY ?? 14;
     this.textColor = options.textColor ?? '#e2e8f0';
     this.textStroke = options.textStroke ?? '#0f172a';
+    this.nickname = options.nickname ?? '';
     this.barBgColor = options.barBgColor ?? 0xef4444;
     this.barRadius = options.barRadius ?? 6;
+
+    this.nicknameText = scene.add.text(0, this.textOffsetY - 20, this.nickname, {
+      fontFamily: 'JungleAdventurer',
+      fontSize: '18px',
+      color: this.textColor,
+      stroke: this.textStroke,
+      strokeThickness: 4
+    }).setOrigin(0.5, 1);
 
     this.hpText = scene.add.text(0, this.textOffsetY, '', {
       fontFamily: 'JungleAdventurer',
@@ -26,9 +35,15 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     this.barBg = scene.add.graphics();
     this.barFill = scene.add.graphics();
 
+    this.add(this.nicknameText);
     this.add(this.hpText);
     this.add(this.barBg);
     this.add(this.barFill);
+  }
+
+  setNickname(nickname) {
+    this.nickname = nickname ?? '';
+    this.nicknameText.setText(this.nickname);
   }
 
   updateHp(currentHp, maxHp) {
@@ -38,6 +53,7 @@ export class HealthIndicator extends Phaser.GameObjects.Container {
     const top = this.barOffsetY - this.barHeight * 0.5;
     const fillWidth = this.maxWidth * hpRatio;
 
+    this.nicknameText.setText(this.nickname);
     this.hpText.setText(`HP ${currentHp}/${safeMaxHp}`);
 
     this.barBg.clear();

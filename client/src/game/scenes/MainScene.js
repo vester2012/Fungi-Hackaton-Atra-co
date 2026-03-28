@@ -275,7 +275,10 @@ export class MainScene extends Phaser.Scene {
   }
 
   createCharacter() {
-    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, { showStats: true });
+    this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE, {
+      showStats: true,
+      nickname: 'Player'
+    });
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
     this.physics.add.collider(
