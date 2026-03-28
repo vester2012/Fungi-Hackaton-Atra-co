@@ -136,7 +136,7 @@ export class MainScene extends Phaser.Scene {
     this.enemyManager?.update(time, delta, this.character);
     this.updateEnemysPlayers(time, delta);
     this.updateHud(time, delta);
-    this.updateSocketInfo(time, delta);
+    //this.updateSocketInfo(time, delta);
   }
 
   updateEnemysPlayers(time, delta) {

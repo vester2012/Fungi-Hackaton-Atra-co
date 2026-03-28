@@ -4,6 +4,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid'); // Если нет uuid, используйте Math.random().toString(36)
 
+const setupSocketHandlers = require('./soket/main'); // Импортируем наш коорддинатор
+
 const app = express();
 const server = http.createServer(app);
 
@@ -31,6 +33,27 @@ const enemies = {
   'enemy-3': { id: 'enemy-3', hp: 100 },
   'enemy-bee-1': { id: 'enemy-bee-1', hp: 10 }
 };
+let idCounter = 0;
+
+const rooms = [
+  {
+    info: {
+      name: 'sandbox',
+      id: ++idCounter,
+      lifespan: -1
+    },
+    password: ''
+  },
+  {
+    info: {
+      name: 'teamAtraCo',
+      id: ++idCounter,
+      lifespan: -1
+    },
+    password: 'tune123'
+  }
+];
+
 
 
 function getRandomSpawnPoint() {
@@ -41,6 +64,10 @@ function getRandomSpawnPoint() {
 const io = new Server(server, {
   cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
 });
+
+//setupSocketHandlers(io);
+
+//#region old_soket
 
 io.on('connection', (socket) => {
 
@@ -92,6 +119,23 @@ io.on('connection', (socket) => {
   });
 
   // Все остальные события используют activePlayers[socket.id]
+  socket.on('create_room', (arg) => {
+    const { sid, roomName, roomPass } = arg;
+    rooms.push({
+      info: {
+        name: roomName,
+        id: ++idCounter,
+        lifespan: -1
+      },
+      created: sid,
+      password: roomPass
+    });
+
+    let list_rooms = rooms.map(obj => obj.info);
+    socket.emit('update_list_rooms', { list_rooms });
+  });
+
+  // Все остальные события используют activePlayers[socket.id]
   socket.on('playerMovement', (movementData) => {
     const player = activePlayers[socket.id];
     if (!player) return;
@@ -131,6 +175,8 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+//#endregion
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(PATH_PUBLIC, 'index.html'));

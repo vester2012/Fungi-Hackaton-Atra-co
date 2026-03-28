@@ -79,7 +79,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.add(this.anim);
 
     if (this.showStats) {
-      this.healthIndicator = new HealthIndicator(scene, 0, -170, {nickname: this.nickname, textOffsetY: 0, barOffsetY: 14, textColor: '#e2e8f0', textStroke: '#0f172a'});
+      this.healthIndicator = new HealthIndicator(scene, 0, -250, {nickname: this.nickname, textOffsetY: 0, barOffsetY: 14, textColor: '#e2e8f0', textStroke: '#0f172a'});
       this.add(this.healthIndicator);
     }
 

@@ -1,3 +1,5 @@
+import {unit_manager} from "../unit_manager";
+
 const Phaser = window.Phaser;
 
 export class MenuScene extends Phaser.Scene {
@@ -30,11 +32,18 @@ export class MenuScene extends Phaser.Scene {
     this.add.rectangle(width * 0.5, height * 0.5, width, height, 0x0b1020, 1);
     this.add.rectangle(width * 0.5, height * 0.5, 900, 560, 0x111827, 0.92);
 
-    this.add.text(width * 0.5, 100, 'Mad Animals', {
+    this.add.text(width * 0.5 - 140, 100, 'MAD', {
       fontFamily: 'JungleAdventurer',
       fontSize: '78px',
-      color: '#f8fafc'
+      color: '#ff6300'
     }).setOrigin(0.5);
+
+    this.add.text(width * 0.5 + 80, 100, 'ANIMALS', {
+      fontFamily: 'JungleAdventurer',
+      fontSize: '78px',
+      color: '#56a23e'
+    }).setOrigin(0.5);
+
     this.add.text(width * 0.5, 150, 'Fungi Hackaton', {
       fontFamily: 'JungleAdventurer',
       fontSize: '20px',
@@ -57,16 +66,22 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('MainScene');
     });
 
-    this.createMenuButton(width * 0.5, 360 * 1.35, 360, 64, 'Button 1', 0x334155, () => {
-      statusText.setText('click button 1');
+    this.createMenuButton(width * 0.5, 360 * 1.35, 360, 64, 'Create room', 0x334155, () => {
+      let roomName = prompt("enter room name");
+      let roomPass = prompt("enter room pass");
+      unit_manager.socket.emit("create_room", { sid: localStorage.getItem('game_session_id'), roomName, roomPass});
+
     });
 
-    this.createMenuButton(width * 0.5, 450 * 1.35, 360, 64, 'Button 2', 0x334155, () => {
-      statusText.setText('click button 2');
+    this.createMenuButton(width * 0.5, 450 * 1.35, 360, 64, 'join room by id', 0x334155, () => {
+      let idRoom = prompt("enter id room");
+      let passRoom = prompt("enter room pass");
+      unit_manager.socket.emit("join_room", { sid: localStorage.getItem('game_session_id'), idRoom, passRoom});
+
     });
 
-    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, 'Button 3', 0x334155, () => {
-      statusText.setText('click button 3');
+    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
+
     });
 
     this.input.once('pointerdown', () => {

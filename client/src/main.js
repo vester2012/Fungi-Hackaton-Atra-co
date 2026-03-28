@@ -61,10 +61,6 @@ async function startGame() {
 
 startGame();
 
-
-
-
-
 //* SOCKET *//
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -90,6 +86,8 @@ if (!savedSession) {
     // Отправляем старую сессию (ник сервер возьмет из базы)
     socket.emit('login', { sessionId: savedSession });
 }
+
+
 
 // Когда сервер подтвердил логин
 socket.on('loginSuccess', (data) => {
@@ -172,6 +170,10 @@ socket.on('enemyHpUpdate', (data) => {
     if (unit_manager.info.enemies[data.id].obj?.setHp) {
         unit_manager.info.enemies[data.id].obj.setHp(data.hp);
     }
+});
+//unit_manager.socket.emit("create_room", { sid: localStorage.getItem('game_session_id'), roomName, roomPass});
+socket.on('update_list_rooms', (data) => {
+    unit_manager.rooms = data.list_rooms;
 });
 
 unit_manager.socket = socket;
