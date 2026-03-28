@@ -6,6 +6,36 @@ import {unit_manager} from "./game/unit_manager.js";
 const params = new URLSearchParams(window.location.search);
 const isDebug = params.has('debug');
 
+// if (!import.meta.env.DEV) {
+if (true) {
+    console.log(
+        '%cStop!',
+        'color: red; font-size: 32px; font-weight: bold;'
+    );
+
+    console.log(
+        '%cThis is a developer console. Do not paste code here unless you understand it.',
+        'color: crimson; font-size: 14px;'
+    );
+    console.log(`
+   ███████████████████████████████████
+   █  HACKER TERMINAL - ROOT ACCESS  █
+   ███████████████████████████████████
+
+                // | \\
+               ||     ||
+               ||     ||
+                '-----'
+               ||     ||
+               ||     ||
+               ||     ||
+              _||_   _||_
+            /    \\ /    \\
+           |      | |     |
+           \\_____/\\_____/
+`);
+}
+
 if (isDebug) {
     import('eruda').then((eruda) => {
         eruda.default.init();
