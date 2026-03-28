@@ -18,13 +18,18 @@ export class MenuScene extends Phaser.Scene {
     this.add.rectangle(width * 0.5, height * 0.5, width, height, 0x0b1020, 1);
     this.add.rectangle(width * 0.5, height * 0.5, 900, 560, 0x111827, 0.92);
 
-    this.add.text(width * 0.5, 120, 'Fungi Hackaton', {
+    this.add.text(width * 0.5, 100, 'Mad Animals', {
       fontFamily: 'JungleAdventurer',
-      fontSize: '54px',
+      fontSize: '78px',
+      color: '#f8fafc'
+    }).setOrigin(0.5);
+    this.add.text(width * 0.5, 150, 'Fungi Hackaton', {
+      fontFamily: 'JungleAdventurer',
+      fontSize: '20px',
       color: '#f8fafc'
     }).setOrigin(0.5);
 
-    this.add.text(width * 0.5, 174, 'Main menu', {
+    this.add.text(width * 0.5, 190, 'Main menu', {
       fontFamily: 'JungleAdventurer',
       fontSize: '22px',
       color: '#94a3b8'
