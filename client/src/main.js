@@ -16,7 +16,6 @@ startGame();
 //* SOCKET *//
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
-console.log('!!!SOCKET_URL:', SOCKET_URL);
 const socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling']
 });

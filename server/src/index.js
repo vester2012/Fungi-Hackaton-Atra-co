@@ -5,6 +5,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+const isMobile = window?.matchMedia("(max-width: 768px)").matches ?? /Mobi|Android/i.test(navigator.userAgent)
 
 const PORT = process.env.PORT || 3000;
 const PATH_PUBLIC = path.resolve(__dirname, '../../client/dist');
@@ -102,6 +103,12 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+if ( process.env.NODE_ENV === 'development' && isMobile ) {
+  import('eruda').then((eruda) => {
+    eruda.default.init();
+  });
+}
 
 // Все запросы, которые не обработаны иначе, отдают index.html из dist
 app.get('*', (req, res) => {
