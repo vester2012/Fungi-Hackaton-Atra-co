@@ -9,7 +9,6 @@ export class Character extends Phaser.GameObjects.Container {
 
     scene.add.existing(this);
     this.controller = new InputManager(scene);
-    this.controller = new InputManager(scene);
     this.hitboxOffsetY = -44;
     this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
 
