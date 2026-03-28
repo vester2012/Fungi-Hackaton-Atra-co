@@ -61,16 +61,7 @@ export class Character extends Phaser.GameObjects.Container {
         strokeThickness: 4
       }).setOrigin(0.5, 1);
 
-      this.attackInfoText = scene.add.text(0, -130, '', {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#fdba74',
-        stroke: '#431407',
-        strokeThickness: 4
-      }).setOrigin(0.5, 1);
-
       this.add(this.hpText);
-      this.add(this.attackInfoText);
     }
 
     this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
@@ -167,15 +158,11 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   syncHpText() {
-    if (!this.showStats || !this.hpText || !this.attackInfoText || !this.hitbox) {
+    if (!this.showStats || !this.hpText || !this.hitbox) {
       return;
     }
 
-    const cooldownLeft = Math.max(0, this.attackCooldownMs - (this.scene.time.now - this.lastAttackAt));
-    const attackState = this.isAttacking() ? 'ATTACK' : cooldownLeft > 0 ? `CD ${Math.ceil(cooldownLeft)}ms` : 'READY';
-
     this.hpText.setText(`HP ${this.hp}/${this.maxHp}`);
-    this.attackInfoText.setText(`ATK ${this.baseDamage} | ${attackState}`);
   }
 
   syncAttackHitbox() {
@@ -337,11 +324,6 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
-    if (this.attackInfoText) {
-      this.attackInfoText.destroy();
-      this.attackInfoText = null;
-    }
-
     if (this.hpText) {
       this.hpText.destroy();
       this.hpText = null;
