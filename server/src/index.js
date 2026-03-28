@@ -81,6 +81,7 @@ io.on('connection', (socket) => {
 // Все запросы, которые не обработаны иначе, отдают index.html из dist
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, PATH_PUBLIC, 'index.html'));
+});
 
 server.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
