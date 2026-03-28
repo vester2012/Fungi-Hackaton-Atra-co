@@ -1,0 +1,403 @@
+{
+  "skeleton": {
+    "hash": "2ddce1d3b69bec9bb903c2eb51fe70cc",
+    "spine": "4.1.24",
+    "x": -310,
+    "y": -260,
+    "width": 620,
+    "height": 520,
+    "images": "./"
+  },
+  "bones": [
+    {
+      "name": "root"
+    },
+    {
+      "name": "glow",
+      "parent": "root"
+    },
+    {
+      "name": "disk_back",
+      "parent": "root"
+    },
+    {
+      "name": "spiral",
+      "parent": "root"
+    },
+    {
+      "name": "core",
+      "parent": "root"
+    },
+    {
+      "name": "disk_front",
+      "parent": "root"
+    }
+  ],
+  "slots": [
+    {
+      "name": "glow",
+      "bone": "glow",
+      "attachment": "glow",
+      "blend": "additive"
+    },
+    {
+      "name": "disk_back",
+      "bone": "disk_back",
+      "attachment": "disk_back",
+      "blend": "additive"
+    },
+    {
+      "name": "spiral",
+      "bone": "spiral",
+      "attachment": "spiral",
+      "blend": "additive"
+    },
+    {
+      "name": "core",
+      "bone": "core",
+      "attachment": "core"
+    },
+    {
+      "name": "disk_front",
+      "bone": "disk_front",
+      "attachment": "disk_front",
+      "blend": "additive"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "glow": {
+          "glow": {
+            "x": 0,
+            "y": 0,
+            "width": 680,
+            "height": 220
+          }
+        },
+        "disk_back": {
+          "disk_back": {
+            "x": 0,
+            "y": -24,
+            "width": 620,
+            "height": 180
+          }
+        },
+        "spiral": {
+          "spiral": {
+            "x": 0,
+            "y": 0,
+            "width": 520,
+            "height": 520
+          }
+        },
+        "core": {
+          "core": {
+            "x": 0,
+            "y": 0,
+            "width": 300,
+            "height": 300
+          }
+        },
+        "disk_front": {
+          "disk_front": {
+            "x": 0,
+            "y": 24,
+            "width": 620,
+            "height": 180
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {
+      "bones": {
+        "core": {
+          "scale": [
+            {
+              "time": 0.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 0.35,
+              "x": 1.05,
+              "y": 1.05
+            },
+            {
+              "time": 0.7,
+              "x": 0.98,
+              "y": 0.98
+            },
+            {
+              "time": 1.1,
+              "x": 1.03,
+              "y": 1.03
+            },
+            {
+              "time": 1.5,
+              "x": 1.0,
+              "y": 1.0
+            }
+          ]
+        },
+        "spiral": {
+          "rotate": [
+            {
+              "time": 0.0,
+              "angle": 0
+            },
+            {
+              "time": 1.0,
+              "angle": 180
+            },
+            {
+              "time": 2.0,
+              "angle": 360
+            }
+          ],
+          "scale": [
+            {
+              "time": 0.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 0.5,
+              "x": 0.93,
+              "y": 0.93
+            },
+            {
+              "time": 1.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 1.5,
+              "x": 0.95,
+              "y": 0.95
+            },
+            {
+              "time": 2.0,
+              "x": 1.0,
+              "y": 1.0
+            }
+          ]
+        },
+        "disk_front": {
+          "rotate": [
+            {
+              "time": 0.0,
+              "angle": -5
+            },
+            {
+              "time": 0.5,
+              "angle": 4
+            },
+            {
+              "time": 1.0,
+              "angle": -4
+            },
+            {
+              "time": 1.5,
+              "angle": 5
+            },
+            {
+              "time": 2.0,
+              "angle": -5
+            }
+          ],
+          "scale": [
+            {
+              "time": 0.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 0.5,
+              "x": 1.06,
+              "y": 1.02
+            },
+            {
+              "time": 1.0,
+              "x": 0.98,
+              "y": 0.98
+            },
+            {
+              "time": 1.5,
+              "x": 1.05,
+              "y": 1.01
+            },
+            {
+              "time": 2.0,
+              "x": 1.0,
+              "y": 1.0
+            }
+          ]
+        },
+        "disk_back": {
+          "rotate": [
+            {
+              "time": 0.0,
+              "angle": 4
+            },
+            {
+              "time": 0.5,
+              "angle": -3
+            },
+            {
+              "time": 1.0,
+              "angle": 3
+            },
+            {
+              "time": 1.5,
+              "angle": -4
+            },
+            {
+              "time": 2.0,
+              "angle": 4
+            }
+          ],
+          "scale": [
+            {
+              "time": 0.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 0.5,
+              "x": 0.96,
+              "y": 0.98
+            },
+            {
+              "time": 1.0,
+              "x": 1.03,
+              "y": 1.01
+            },
+            {
+              "time": 1.5,
+              "x": 0.97,
+              "y": 0.99
+            },
+            {
+              "time": 2.0,
+              "x": 1.0,
+              "y": 1.0
+            }
+          ]
+        },
+        "glow": {
+          "scale": [
+            {
+              "time": 0.0,
+              "x": 1.0,
+              "y": 1.0
+            },
+            {
+              "time": 1.0,
+              "x": 1.03,
+              "y": 1.0
+            },
+            {
+              "time": 2.0,
+              "x": 1.0,
+              "y": 1.0
+            }
+          ]
+        }
+      },
+      "slots": {
+        "spiral": {
+          "color": [
+            {
+              "time": 0.0,
+              "color": "FFCC88CC"
+            },
+            {
+              "time": 0.4,
+              "color": "FFF2CCFF"
+            },
+            {
+              "time": 0.8,
+              "color": "FFB86ECC"
+            },
+            {
+              "time": 1.2,
+              "color": "FFF2CCFF"
+            },
+            {
+              "time": 2.0,
+              "color": "FFCC88CC"
+            }
+          ]
+        },
+        "disk_front": {
+          "color": [
+            {
+              "time": 0.0,
+              "color": "FFF0DDFF"
+            },
+            {
+              "time": 0.5,
+              "color": "FFFFFFFF"
+            },
+            {
+              "time": 1.0,
+              "color": "FFD39FFF"
+            },
+            {
+              "time": 1.5,
+              "color": "FFFFFFFF"
+            },
+            {
+              "time": 2.0,
+              "color": "FFF0DDFF"
+            }
+          ]
+        },
+        "disk_back": {
+          "color": [
+            {
+              "time": 0.0,
+              "color": "FF9C6688"
+            },
+            {
+              "time": 0.5,
+              "color": "FFC27CBB"
+            },
+            {
+              "time": 1.0,
+              "color": "FF7A4A77"
+            },
+            {
+              "time": 1.5,
+              "color": "FFC27CBB"
+            },
+            {
+              "time": 2.0,
+              "color": "FF9C6688"
+            }
+          ]
+        },
+        "glow": {
+          "color": [
+            {
+              "time": 0.0,
+              "color": "7A5AB466"
+            },
+            {
+              "time": 1.0,
+              "color": "A07BDC88"
+            },
+            {
+              "time": 2.0,
+              "color": "7A5AB466"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
