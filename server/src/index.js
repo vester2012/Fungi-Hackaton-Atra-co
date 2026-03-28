@@ -5,28 +5,29 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-//const io = new Server(server);
 
-const PATH_PUBLIC = '../../client/dist';
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173", // Порт твоего Webpack Dev Server
-    methods: ["GET", "POST"]
-  }
+const PORT = process.env.PORT || 3000;
+const PATH_PUBLIC = path.resolve(__dirname, '../../client/dist');
+
+// Health check
+app.get('/health', (_req, res) => {
+  res.status(200).send('ok');
 });
 
-app.use(express.static(path.join(__dirname, PATH_PUBLIC)));
-
-// Все запросы, которые не обработаны иначе, отдают index.html из dist
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, PATH_PUBLIC, 'index.html'));
-});
-
+// Static files from Phaser build
+app.use(express.static(PATH_PUBLIC));
 
 // Хранилище игроков
 const players = {};
 
-
+// Socket.IO
+const io = new Server(server, {
+  cors: {
+    // origin: true
+    origin: "http://localhost:5173", // Порт твоего Webpack Dev Server
+    methods: ["GET", "POST"]
+  }
+});
 
 io.on('connection', (socket) => {
   console.log(`Игрок подключился: ${socket.id}`);
@@ -43,18 +44,18 @@ io.on('connection', (socket) => {
 
   // Отправляем текущему игроку список всех остальных
   socket.emit('currentPlayers', players);
-
   // Оповещаем остальных, что зашел новый игрок
   socket.broadcast.emit('newPlayer', players[socket.id]);
 
   // Обработка движения
   socket.on('playerMovement', (movementData) => {
-    if (players[socket.id]) {
-      players[socket.id].x = movementData.x;
-      players[socket.id].y = movementData.y;
-      // Рассылаем всем обновленную позицию этого игрока
-      socket.broadcast.emit('playerMoved', players[socket.id]);
-    }
+    if (!players[socket.id]) return;
+
+    players[socket.id].x = movementData.x;
+    players[socket.id].y = movementData.y;
+
+    // Рассылаем всем обновленную позицию этого игрока
+    socket.broadcast.emit('playerMoved', players[socket.id]);
   });
 
   // Обработка удара (атаки)
@@ -77,25 +78,10 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
-});
+// Все запросы, которые не обработаны иначе, отдают index.html из dist
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, PATH_PUBLIC, 'index.html'));
 
-// import http from 'node:http';
-//
-// const port = Number(process.env.PORT || 3000);
-//
-// const server = http.createServer((req, res) => {
-//   res.writeHead(200, { 'Content-Type': 'application/json' });
-//   res.end(JSON.stringify({
-//     ok: true,
-//     service: 'fungi-hackaton-server',
-//     path: req.url
-//   }));
-// });
-//
-// server.listen(port, () => {
-//   console.log(`Server listening on http://localhost:${port}`);
-// });
-//
+server.listen(PORT, () => {
+  console.log(`Сервер запущен на порту ${PORT}`);
+});
