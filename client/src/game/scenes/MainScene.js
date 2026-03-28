@@ -29,6 +29,9 @@ export class MainScene extends Phaser.Scene {
     const viewHeight = this.scale.height;
     this.worldWidth = viewWidth * WORLD_SCALE;
     this.worldHeight = viewHeight * WORLD_SCALE;
+    this.hearts = 0;
+    this.heartsConstNumber = 3; // сколько максимум сердечек на поле одномоментно
+    this.heartHealing = 25; // на сколько сердечко восстанавливает здоровье
 
     this.cameras.main.setBackgroundColor('#132238');
     this.cameras.main.roundPixels = true;
@@ -80,6 +83,7 @@ export class MainScene extends Phaser.Scene {
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
     this.createDebugZoomControls(viewWidth);
+    this.generateHearts();
   }
 
 
@@ -605,5 +609,98 @@ export class MainScene extends Phaser.Scene {
         this.isBlackHoleTriggered = false;
       }
     });
+  }
+
+  generateHearts(delayedTime = 0) {
+    this.time.delayedCall(delayedTime, () => {
+        if(this.hearts >= this.heartsConstNumber) {
+          this.generateHearts(5000);
+          return;
+        }
+        else {
+          const heartsLength = this.hearts;
+          for(let i = 1; i<= (this.heartsConstNumber - heartsLength); i++){
+            this.addHeartToRandomPos();
+          }
+          this.generateHearts(5000);
+        }
+    });
+  }
+
+  addHeartToRandomPos(){
+    let heart;
+    this.positionsForHeart = [{x: 1400 * WORLD_SCALE, y: 580 * WORLD_SCALE, active: false}, {x: 1700 * WORLD_SCALE, y: 470 * WORLD_SCALE, active: false}, {x: 1800 * WORLD_SCALE, y: 230 * WORLD_SCALE, active: false}, {x: 1100 * WORLD_SCALE, y: 420 * WORLD_SCALE, active: false}, {x: 820 * WORLD_SCALE, y: 240 * WORLD_SCALE, active: false}, {x: 760 * WORLD_SCALE, y: 490 * WORLD_SCALE, active: false}, {x: 360 * WORLD_SCALE, y: 410 * WORLD_SCALE, active: false}]
+    const freePositions = this.positionsForHeart.filter(p => !p.active);
+    if (freePositions.length > 0) {
+        const pos = Phaser.Utils.Array.GetRandom(freePositions);
+        pos.active = true;
+        
+        heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
+        this.hearts += 1;
+        heart.posRef = pos;
+        
+        this.addPhysicForNewHeart(heart);
+    }
+  }
+
+  addPhysicForNewHeart(heart){
+    const heartZone = this.add.zone(
+      heart.x,
+      heart.y,
+      10 * WORLD_SCALE,
+      10 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(heartZone);
+
+    heartZone.body.setAllowGravity(false);
+    heartZone.body.setImmovable(true);
+
+    this.physics.add.overlap(
+      this.character.getPhysicsTarget(),
+      heartZone,
+      this.onHeartTouch.bind(this, heart, heartZone),
+      null,
+      this
+    );
+  }
+
+  onHeartTouch(heart, heartZone){
+    if (this.heartTouched) return;
+  
+    console.log(heart)
+    this.heartTouched = true;
+    console.log("heartTouced");
+    
+    // восстанавливаем hp
+    const curHp = this.character.getHp();
+    const maxHp = this.character.getMaxHp();
+    ((maxHp - curHp) >= this.heartHealing) ? this.character.setHp(curHp + this.heartHealing) : this.character.setHp(maxHp);
+
+    this.tweens.add({
+      targets: heart,
+      alpha: 0,
+      duration: 1200,
+      onComplete: () => {
+        this.hearts -= 1
+        if (heart) {
+          heart.posRef.active = false;
+          heart.destroy();
+          heartZone.heart = null;
+        }
+        if (heartZone.overlapRef) {
+          heartZone.overlapRef.destroy();
+          heartZone.overlapRef = null;
+        }
+
+        if (heartZone.body) {
+          heartZone.body.destroy();
+        }
+
+        heartZone.destroy();
+        this.heartTouched = false;
+      }
+    });
+
   }
 }
