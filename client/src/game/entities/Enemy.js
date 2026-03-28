@@ -1,5 +1,6 @@
 const Phaser = window.Phaser;
 import { HealthIndicator } from "./HealthIndicator.js";
+import { DamagePopup } from "./DamagePopup.js";
 
 export class Enemy extends Phaser.GameObjects.Container {
   constructor(scene, x, y) {
@@ -34,9 +35,7 @@ export class Enemy extends Phaser.GameObjects.Container {
       textOffsetY: 0,
       barOffsetY: 10,
       textColor: '#fee2e2',
-      textStroke: '#450a0a',
-      barBgColor: 0x1f2937,
-      barStrokeColor: 0x7f1d1d
+      textStroke: '#450a0a'
     });
 
     this.attackZone = scene.add.rectangle(x, y - 24, 65, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
@@ -117,6 +116,7 @@ export class Enemy extends Phaser.GameObjects.Container {
 
     this.hp = Math.max(0, this.hp - amount);
     this.visual.setFillStyle(0xf87171, 1);
+    new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount, { color: '#fecaca', stroke: '#7f1d1d' });
 
     if (this.damageFlashTimer) {
       this.damageFlashTimer.remove(false);

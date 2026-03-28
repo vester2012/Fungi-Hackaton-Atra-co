@@ -1,5 +1,6 @@
 import {InputManager} from "../managers/InputManager";
 import { HealthIndicator } from "./HealthIndicator.js";
+import { DamagePopup } from "./DamagePopup.js";
 
 const Phaser = window.Phaser;
 import {unit_manager} from "../unit_manager.js";
@@ -58,9 +59,7 @@ export class Character extends Phaser.GameObjects.Container {
         textOffsetY: 0,
         barOffsetY: 14,
         textColor: '#e2e8f0',
-        textStroke: '#0f172a',
-        barBgColor: 0x0f172a,
-        barStrokeColor: 0x475569
+        textStroke: '#0f172a'
       });
       this.add(this.healthIndicator);
     }
@@ -170,10 +169,7 @@ export class Character extends Phaser.GameObjects.Container {
     const isActive = this.isAttacking();
     const directionOffset = (this.hitbox.width * 0.5 + this.attackWidth * 0.5) * this.facingDirection;
 
-    this.attackHitbox.setPosition(
-      Math.round(this.hitbox.x + directionOffset),
-      Math.round(this.hitbox.y - 8)
-    );
+    this.attackHitbox.setPosition(Math.round(this.hitbox.x + directionOffset), Math.round(this.hitbox.y - 8));
     this.attackHitbox.setVisible(isActive);
   }
 
@@ -288,6 +284,7 @@ export class Character extends Phaser.GameObjects.Container {
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
     this.syncHpText();
+    new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
 
