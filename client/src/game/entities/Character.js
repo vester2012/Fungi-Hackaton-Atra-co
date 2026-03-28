@@ -1,3 +1,5 @@
+import {InputManager} from "../managers/InputManager";
+
 const Phaser = window.Phaser;
 import {unit_manager} from "../unit_manager.js";
 
@@ -6,7 +8,7 @@ export class Character extends Phaser.GameObjects.Container {
     super(scene, x, y);
 
     scene.add.existing(this);
-
+    this.controller = new InputManager(scene);
     this.hitboxOffsetY = -44;
     this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 80, 130, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
 
@@ -42,14 +44,6 @@ export class Character extends Phaser.GameObjects.Container {
     this.dropThroughUntil = 0;
     this.downTapWindowMs = 250;
     this.dropThroughDurationMs = 220;
-    this.cursors = scene.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
-      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
-      enter: Phaser.Input.Keyboard.KeyCodes.ENTER
-    });
 
     this.add(this.anim = scene.add.spine(0, 0, 'person_SPO', 'idle', true));
     this.anim.setScale(0.15);
@@ -61,12 +55,15 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   update() {
+    this.controller.update();
+
     const now = this.scene.time.now;
-    const leftPressed = this.cursors.left.isDown;
-    const rightPressed = this.cursors.right.isDown;
-    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.cursors.space);
-    const attackPressed = Phaser.Input.Keyboard.JustDown(this.cursors.enter);
-    const downPressed = Phaser.Input.Keyboard.JustDown(this.cursors.down);
+    const leftPressed = this.controller.left;
+    const rightPressed = this.controller.right;
+    const jumpPressed = this.controller.jumpJustPressed;
+    const attackPressed = this.controller.attackJustPressed;
+    const downPressed = this.controller.downJustPressed;
+
     const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
     const movingHorizontally = leftPressed !== rightPressed;
 
@@ -109,13 +106,6 @@ export class Character extends Phaser.GameObjects.Container {
     }
     this.syncContainerToHitbox();
   }
-  //
-  // isMoving() {
-  //   const leftPressed = this.cursors.left.isDown;
-  //   const rightPressed = this.cursors.right.isDown;
-  //   const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
-  //   return leftPressed && rightPressed || !isGrounded;
-  // }
 
   getPhysicsTarget() {
     return this.hitbox;
@@ -319,6 +309,11 @@ export class Character extends Phaser.GameObjects.Container {
     if (this.hitbox) {
       this.hitbox.destroy();
       this.hitbox = null;
+    }
+
+    // Если нужно, чистим ивенты инпута
+    if (this.controller) {
+      this.controller = null;
     }
 
     super.destroy(fromScene);

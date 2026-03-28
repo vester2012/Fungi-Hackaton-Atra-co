@@ -2,6 +2,7 @@ import { Character } from '../entities/Character.js';
 import { Enemy } from '../entities/Enemy.js';
 import { Platform } from '../entities/Platform.js';
 import {unit_manager} from "../unit_manager";
+import {MobileUI} from "../ui/MobileUI";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -227,6 +228,7 @@ export class MainScene extends Phaser.Scene {
 
   createCharacter() {
     this.character = new Character(this, 220 * WORLD_SCALE, 650 * WORLD_SCALE);
+    this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
     this.physics.add.collider(
       this.character.getPhysicsTarget(),

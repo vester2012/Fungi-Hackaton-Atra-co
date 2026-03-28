@@ -11,6 +11,9 @@ export function bootGame(parent) {
     width: 1920,
     height: 1080,
     backgroundColor: '#10151f',
+    input:{
+      gamepad: true
+    },
     physics: {
       default: 'arcade',
       arcade: {
