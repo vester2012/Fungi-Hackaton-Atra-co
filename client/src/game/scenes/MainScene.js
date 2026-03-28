@@ -147,10 +147,6 @@ export class MainScene extends Phaser.Scene {
           data.lastPlayedAttackId = data.pendingAttackId;
           data.obj.playRemoteAttack(time);
         }
-        if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
-          value.lastPlayedAttackId = value.pendingAttackId;
-          value.obj.playRemoteAttack(this.time.now);
-        }
       }
     }
   }
