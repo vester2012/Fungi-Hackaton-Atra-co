@@ -141,13 +141,10 @@ export class MainScene extends Phaser.Scene {
         if (typeof value.hp === 'number') {
           value.obj.setHp(value.hp);
         }
-
-
-        // if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
-        //   value.lastPlayedAttackId = value.pendingAttackId;
-        //   value.obj.playRemoteAttack(this.time.now);
-        //   this.getCollisionAttack();
-        // }
+        if (value.pendingAttackId && value.pendingAttackId !== value.lastPlayedAttackId) {
+          value.lastPlayedAttackId = value.pendingAttackId;
+          value.obj.playRemoteAttack(this.time.now);
+        }
       }
     }
   }
