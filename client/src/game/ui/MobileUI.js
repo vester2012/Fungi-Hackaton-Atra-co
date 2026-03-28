@@ -6,12 +6,16 @@ export class MobileUI {
         this.inputManager = inputManager;
         this.elements =[];
 
+        // Включаем поддержку дополнительных касаний (мультитач).
+        // Добавляем 3 дополнительных указателя (итого будет до 4-5 одновременных нажатий)
+        this.scene.input.addPointer(3);
+
         this.isVisible = scene.sys.game.device.input.touch;
         const width = scene.scale.width;
         const height = scene.scale.height;
 
-        const locateX = 50
-        const locateY = -50
+        const locateX = 50;
+        const locateY = -50;
         this.createButton(80  + locateX, height - 80  + locateY, '←', 'left');
         this.createButton(290 + locateX, height - 80 + locateY, '↓', 'down');
         this.createButton(500 + locateX, height - 80  + locateY, '→', 'right');
@@ -23,12 +27,10 @@ export class MobileUI {
             this.hide();
         }
 
-
         this.setupAutoSwitching();
     }
 
     createButton(x, y, label, actionKey) {
-
         const btn = this.scene.add.circle(x, y, 100, 0xffffff, 0.2)
             .setScrollFactor(0)
             .setInteractive()
@@ -43,17 +45,30 @@ export class MobileUI {
             .setScrollFactor(0)
             .setDepth(1001);
 
-        btn.on('pointerdown', () => {
+        // Функция нажатия на кнопку
+        const press = () => {
             this.inputManager.virtualInput[actionKey] = true;
             btn.setFillStyle(0x38bdf8, 0.6);
             this.show();
-        });
+        };
 
+        // Функция отпускания кнопки
         const release = () => {
             this.inputManager.virtualInput[actionKey] = false;
             btn.setFillStyle(0xffffff, 0.2);
         };
 
+        // Стандартное нажатие
+        btn.on('pointerdown', press);
+
+        // Поддержка свайпов: если палец УЖЕ нажат и скользит на эту кнопку
+        btn.on('pointerover', (pointer) => {
+            if (pointer.isDown) {
+                press();
+            }
+        });
+
+        // Отпускание или уход пальца с кнопки
         btn.on('pointerup', release);
         btn.on('pointerout', release);
 

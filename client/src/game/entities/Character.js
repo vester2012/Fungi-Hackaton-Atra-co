@@ -156,9 +156,15 @@ export class Character extends Phaser.GameObjects.Container {
 
     // 5. Платформы (Drop Through)
     if (downPressed) {
-      if (now - this.lastDownTapAt <= this.downTapWindowMs && isGrounded && this.isStandingOnDropThroughPlatform()) {
+      // Я чуть увеличил окно двойного клика (с 250 до 350 мс), чтобы было легче нажимать
+      if (now - this.lastDownTapAt <= 350 && isGrounded && this.isStandingOnDropThroughPlatform()) {
         this.dropThroughUntil = now + this.dropThroughDurationMs;
-        this.hitbox.body.setVelocityY(120);
+
+        // ВАЖНО: сдвигаем хитбокс принудительно на 5 пикселей вниз, чтобы пройти границу (platform.top)
+        this.hitbox.y += 5;
+
+        // Даем начальную скорость вниз
+        this.hitbox.body.setVelocityY(200);
       }
       this.lastDownTapAt = now;
     }
@@ -199,17 +205,20 @@ export class Character extends Phaser.GameObjects.Container {
 
   isStandingOnDropThroughPlatform() {
     const body = this.hitbox.body;
-    const feetX = body.center.x;
-    const feetY = body.bottom + 2;
     return this.scene.platforms.getChildren().some((platform) => {
       if (!platform.isDropThrough) return false;
-      const halfWidth = platform.width * 0.5;
-      const nearTop = Math.abs(body.bottom - platform.body.top) <= 8;
-      const withinWidth = feetX >= platform.x - halfWidth && feetX <= platform.x + halfWidth;
-      const abovePlatform = feetY >= platform.body.top && feetY <= platform.body.top + 12;
-      return nearTop && withinWidth && abovePlatform;
+
+      // 1. Проверяем, что низ игрока совпадает с верхом платформы (с допуском 5 пикселей)
+      const isOnTop = Math.abs(body.bottom - platform.body.top) <= 5;
+
+      // 2. Проверяем, что игрок находится внутри ширины платформы
+      const isWithinX = body.right > platform.body.left && body.left < platform.body.right;
+
+      return isOnTop && isWithinX;
     });
   }
+
+
 
   syncContainerToHitbox() {
     this.isSyncingFromHitbox = true;
@@ -299,13 +308,15 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   shouldCollideWithPlatform(platform) {
+    // Твердые платформы — всегда сталкиваемся
     if (!platform.isDropThrough) return true;
+
+    // Если активировано падение (спрыгивание вниз двойным кликом S / Вниз) — отключаем коллизию!
     if (this.isDroppingThroughPlatform()) return false;
-    const body = this.hitbox.body;
-    const platformTop = platform.body.top;
-    const previousBottom = body.bottom - body.velocity.y * this.scene.game.loop.delta / 1000;
-    return body.velocity.y >= 0 && previousBottom <= platformTop + 8;
+    
+    return true;
   }
+
 
   setAnimation(name, loop) {
     if (this.currentAnimation === name) return;

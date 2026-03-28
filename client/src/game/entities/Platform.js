@@ -16,6 +16,14 @@ export class Platform {
     scene.physics.add.existing(this.gameObject, true);
     this.gameObject.body.updateFromGameObject();
 
+    if (this.isDropThrough) {
+      // Отключаем столкновения снизу, слева и справа
+      this.gameObject.body.checkCollision.down = false;
+      this.gameObject.body.checkCollision.left = false;
+      this.gameObject.body.checkCollision.right = false;
+      // up остается true по умолчанию (чтобы можно было стоять на ней)
+    }
+
     this.gameObject.platformType = this.type;
     this.gameObject.isDropThrough = this.isDropThrough;
   }
