@@ -1,7 +1,7 @@
 import { Character } from '../entities/Character.js';
 import { Enemy } from '../entities/Enemy.js';
-import { FlyingEnemy } from '../entities/FlyingEnemy.js';
 import { Platform } from '../entities/Platform.js';
+import { EnemyManager } from '../managers/EnemyManager.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
 import {WallSlideZone} from "../systems/WallSlideZone";
@@ -13,8 +13,7 @@ const WORLD_SCALE = 2;
 const ENEMY_SPAWNS = [
   { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE, type: 'ground' },
   { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-bee-1', x: 900 * WORLD_SCALE, y: 360 * WORLD_SCALE, type: 'flying' }
+  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE, type: 'ground' }
 ];
 
 export class MainScene extends Phaser.Scene {
@@ -47,6 +46,7 @@ export class MainScene extends Phaser.Scene {
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();
     this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
+    this.enemyManager = new EnemyManager(this, { targetFlyingCount: 2 });
     this.createHud(viewWidth);
     this.createBlackHole({x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE});
     this.createBlackHole({x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE});
@@ -133,6 +133,7 @@ export class MainScene extends Phaser.Scene {
 
     this.handleCharacterDeath();
     this.updateEnemiesBot(time, delta);
+    this.enemyManager?.update(time, delta, this.character);
     this.updateEnemysPlayers(time, delta);
     this.updateHud(time, delta);
     this.updateSocketInfo(time, delta);
@@ -367,8 +368,7 @@ export class MainScene extends Phaser.Scene {
   createEnemiesBot() {
     this.enemiesBot = ENEMY_SPAWNS.map((spawn) => {
       const enemyState = unit_manager.info.enemies[spawn.id];
-      const EnemyClass = spawn.type === 'flying' ? FlyingEnemy : Enemy;
-      const enemy = new EnemyClass(this, spawn.x, spawn.y, { id: spawn.id });
+      const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
 
       if (typeof enemyState?.hp === 'number') {
         enemy.setHp(enemyState.hp);
@@ -385,9 +385,7 @@ export class MainScene extends Phaser.Scene {
 
     this.enemiesBot.forEach((enemy) => {
       enemy.setDepth(2);
-      if (enemy.usesPlatformCollider !== false) {
-        this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
-      }
+      this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
     });
   }
 
@@ -433,6 +431,8 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
+    this.enemyManager?.handlePlayerAttack(playerAttackBounds, attackId, this.character.getAttackDamage());
+
     // Фильтрация и очистка
     for (let i = this.enemiesBot.length - 1; i >= 0; i--) {
         if (this.enemiesBot[i].isDead() && (!this.enemiesBot[i].isReadyToDestroy || this.enemiesBot[i].isReadyToDestroy(time))) {
@@ -462,6 +462,7 @@ export class MainScene extends Phaser.Scene {
 
     this.character.destroy();
     this.character = null;
+    this.enemyManager?.destroy();
     this.scene.start('MenuScene');
   }
 

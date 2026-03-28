@@ -7,8 +7,8 @@ export class FlyingEnemy extends Enemy {
   constructor(scene, x, y, options = {}) {
     super(scene, x, y, options);
 
-    this.maxHp = 20;
-    this.hp = 20;
+    this.maxHp = 10;
+    this.hp = 10;
     this.usesPlatformCollider = false;
     this.baseX = x;
     this.baseY = y - 38;
@@ -17,8 +17,13 @@ export class FlyingEnemy extends Enemy {
     this.horizontalLerp = options.horizontalLerp ?? 0.02;
     this.verticalLerp = options.verticalLerp ?? 0.04;
     this.hoverPhase = options.hoverPhase ?? Math.random() * Math.PI * 2;
+    this.patrolRadiusX = options.patrolRadiusX ?? 180;
+    this.patrolRadiusY = options.patrolRadiusY ?? 90;
+    this.patrolSpeedX = options.patrolSpeedX ?? 0.0009;
+    this.patrolSpeedY = options.patrolSpeedY ?? 0.0013;
     this.approachGap = options.approachGap ?? 18;
     this.verticalAttackOffset = options.verticalAttackOffset ?? -8;
+    this.detectionRadius = options.detectionRadius ?? 320;
     this.deadAt = 0;
     this.deathAnimationDurationMs = 600;
 
@@ -50,21 +55,29 @@ export class FlyingEnemy extends Enemy {
 
     if (player) {
       const playerBody = player.getPhysicsTarget();
+      const distanceToPlayer = Phaser.Math.Distance.Between(this.hitbox.x, this.hitbox.y, playerBody.x, playerBody.y);
+      const seesPlayer = distanceToPlayer <= this.detectionRadius;
+
       this.facingDirection = playerBody.x >= this.hitbox.x ? 1 : -1;
 
       const hoverOffsetY = Math.sin(now * this.hoverSpeed + this.hoverPhase) * this.hoverAmplitude;
       const playerHalfWidth = playerBody.width * 0.5;
       const enemyHalfWidth = this.hitbox.width * 0.5;
-      const targetEdgeX = this.facingDirection > 0
-        ? playerBody.x - playerHalfWidth - enemyHalfWidth - this.approachGap
-        : playerBody.x + playerHalfWidth + enemyHalfWidth + this.approachGap;
+      const targetEdgeX = seesPlayer
+        ? (this.facingDirection > 0
+            ? playerBody.x - playerHalfWidth - enemyHalfWidth - this.approachGap
+            : playerBody.x + playerHalfWidth + enemyHalfWidth + this.approachGap)
+        : this.baseX + Math.cos(now * this.patrolSpeedX + this.hoverPhase) * this.patrolRadiusX;
+      const targetY = seesPlayer
+        ? playerBody.y + this.verticalAttackOffset + hoverOffsetY
+        : this.baseY + Math.sin(now * this.patrolSpeedY + this.hoverPhase) * this.patrolRadiusY + hoverOffsetY * 0.35;
       const desiredX = Phaser.Math.Linear(this.hitbox.x, targetEdgeX, this.horizontalLerp);
-      const targetY = playerBody.y + this.verticalAttackOffset + hoverOffsetY;
       const desiredY = Phaser.Math.Linear(this.hitbox.y, targetY, this.verticalLerp);
       this.hitbox.body.reset(desiredX, desiredY);
     } else {
-      const hoverY = this.baseY + Math.sin(now * this.hoverSpeed + this.hoverPhase) * this.hoverAmplitude;
-      this.hitbox.body.reset(this.baseX, hoverY);
+      const patrolX = this.baseX + Math.cos(now * this.patrolSpeedX + this.hoverPhase) * this.patrolRadiusX;
+      const patrolY = this.baseY + Math.sin(now * this.patrolSpeedY + this.hoverPhase) * this.patrolRadiusY;
+      this.hitbox.body.reset(patrolX, patrolY);
     }
 
     this.visual.scaleX = this.facingDirection < 0 ? Math.abs(this.visual.scaleX) : -Math.abs(this.visual.scaleX);
