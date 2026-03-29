@@ -35,6 +35,14 @@ const enemies = {
 };
 let idCounter = 0;
 
+let arrQueue = [
+  {
+    totalLots: 4,
+    remainLots: 0,
+    players: []
+  }
+];
+
 const rooms = [
   {
     info: {
@@ -54,12 +62,29 @@ const rooms = [
   }
 ];
 
+const animals = [
+  {
+    name: 'корови',
+    id: 0,
+    hp: 100,
+    damage: 20
+  },
+  {
+    name: 'тупорыба',
+    atlas: 'fish',
+    id: 1,
+    hp: 100,
+    damage: 20
+  }
+];
 
 
 function getRandomSpawnPoint() {
   const index = Math.floor(Math.random() * SPAWN_POINTS.length);
   return { ...SPAWN_POINTS[index] };
 }
+
+
 
 const io = new Server(server, {
   cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
@@ -111,72 +136,53 @@ io.on('connection', (socket) => {
   });
 
   // Все остальные события используют activePlayers[socket.id]
-  socket.on('create_room', (arg) => {
-    const { sid, roomName, roomPass } = arg;
-    rooms.push({
-      info: {
-        name: roomName,
-        id: ++idCounter,
-        lifespan: -1
-      },
-      created: sid,
-      password: roomPass,
-      enemies: JSON.parse(JSON.stringify(enemies)) // Сразу даем комнате своих врагов
-    });
+  socket.on('mm', (arg) => {
+    const { sid, numPlayersOfRoom } = arg;
 
-    let list_rooms = rooms.map(obj => obj.info);
+
+    let queue;
+    for (let i = 0; i < arrQueue.length; i++) {
+        if (arrQueue[i].totalLots === numPlayersOfRoom) {
+          queue = arrQueue[i];
+          queue.remainLots--;
+          queue.players.push(sid);
+          break;
+        }
+    }
+    if (!queue) {
+      let listRooms = createRoom({sid, roomName: 'mm' + sid, passRoom: sid})
+      let room = rooms[rooms.length];
+      queue = {
+        totalLots: 4,
+        remainLots: 0,
+        players: [],
+        idRoom: room.id,
+        passRoom: room.password
+      }
+      arrQueue.push(queue);
+
+      let list_rooms = rooms.map(obj => obj.info);
+      socket.emit('update_list_rooms', { list_rooms });
+    }
+    else {
+      joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
+      if (queue.remainLots === 0) {
+        socket.emit('mm_is_already', { idRoom: queue.idRoom, passRoom: queue.passRoom });
+        arrQueue = arrQueue.filter(el=> el.sid !== sid);
+      }
+    }
+
+    socket.emit('mm_newPlayer', { queue });
+  });
+
+  // Все остальные события используют activePlayers[socket.id]
+  socket.on('create_room', (arg) => {
+    let list_rooms = createRoom(arg);
     socket.emit('update_list_rooms', { list_rooms });
   });
 
   socket.on('join_room', (data) => {
-    const { sid, idRoom, passRoom } = data;
-    const player = sessionDatabase[sid];
-
-    // Ищем комнату в массиве по ID (приводим к числу, если нужно)
-    const roomIndex = rooms.findIndex(r => r.info.id == idRoom);
-    const room = rooms[roomIndex];
-
-    if (!room) {
-      return socket.emit('error_msg', 'Комната не найдена');
-    }
-
-    // Проверяем пароль
-    if (room.password !== "" && room.password !== passRoom) {
-      return socket.emit('error_msg', 'Неверный пароль');
-    }
-
-    if (player) {
-      // 1. Уходим из предыдущей комнаты, если она была
-      if (player.roomId) {
-        socket.leave(player.roomId);
-      }
-
-      // 2. Привязываем игрока к новой комнате
-      player.roomId = idRoom;
-      socket.join(idRoom);
-
-      // 3. Если в этой комнате еще нет своих врагов — создаем их (копируем дефолтных)
-      if (!room.enemies) {
-        room.enemies = JSON.parse(JSON.stringify(enemies));
-      }
-
-      console.log(`Игрок ${player.username} зашел в комнату ${idRoom}`);
-
-      // 4. Сообщаем клиенту, что вход успешен
-      socket.emit('joined_room_success', { roomId: idRoom });
-
-      // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
-      const playersInRoom = {};
-      Object.values(activePlayers).forEach(p => {
-        if (p.roomId == idRoom) playersInRoom[p.id] = p;
-      });
-
-      socket.emit('currentPlayers', playersInRoom);
-      socket.emit('currentEnemies', room.enemies);
-
-      // Оповещаем остальных ВНУТРИ комнаты
-      socket.to(idRoom).emit('newPlayer', player);
-    }
+    joinToRoom(socket, data);
   });
 
   socket.on('playerDied', () => {
@@ -269,6 +275,77 @@ io.on('connection', (socket) => {
   });
 
 });
+
+function createRoom(arg) {
+  const { sid, roomName, roomPass } = arg;
+  rooms.push({
+    info: {
+      name: roomName,
+      id: ++idCounter,
+      lifespan: -1
+    },
+    created: sid,
+    password: roomPass,
+    enemies: JSON.parse(JSON.stringify(enemies)) // Сразу даем комнате своих врагов
+  });
+
+
+  let list_rooms = rooms.map(obj => obj.info);
+  return list_rooms;
+}
+function joinToRoom( socket, data, ismm ) {
+  const prefix = ismm ? '_queue' : '';
+  const { sid, idRoom, passRoom } = data;
+  const player = sessionDatabase[sid];
+
+  // Ищем комнату в массиве по ID (приводим к числу, если нужно)
+  const roomIndex = rooms.findIndex(r => r.info.id === idRoom);
+  const room = rooms[roomIndex];
+
+  if (!ismm) {
+    if (!room) {
+      return socket.emit('error_msg', 'Комната не найдена');
+    }
+
+    // Проверяем пароль
+    if (room.password !== "" && room.password !== passRoom) {
+      return socket.emit('error_msg', 'Неверный пароль');
+    }
+  }
+
+  if (player) {
+    // 1. Уходим из предыдущей комнаты, если она была
+    if (player.roomId) {
+      socket.leave(player.roomId);
+    }
+
+    // 2. Привязываем игрока к новой комнате
+    player.roomId = idRoom;
+    socket.join(idRoom);
+
+    // 3. Если в этой комнате еще нет своих врагов — создаем их (копируем дефолтных)
+    if (!room.enemies) {
+      room.enemies = JSON.parse(JSON.stringify(enemies));
+    }
+
+    console.log(`Игрок ${player.username} зашел в комнату ${room.info.name} (${idRoom})`);
+
+    // 4. Сообщаем клиенту, что вход успешен
+    socket.emit('joined_room_success' + prefix, { roomId: idRoom });
+
+    // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
+    const playersInRoom = {};
+    Object.values(activePlayers).forEach(p => {
+      if (p.roomId == idRoom) playersInRoom[p.id] = p;
+    });
+
+    socket.emit('currentPlayers' + prefix, playersInRoom);
+    socket.emit('currentEnemies' + prefix, room.enemies);
+
+    // Оповещаем остальных ВНУТРИ комнаты
+    socket.to(idRoom).emit('newPlayer' + prefix, player);
+  }
+}
 
 //#endregion
 
