@@ -1,7 +1,12 @@
 import './style.css';
 import { io } from "socket.io-client";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { bootGame } from './game/bootGame.js';
 import {unit_manager} from "./game/unit_manager.js";
+
+import './style.css';
+import App from './App.jsx';
 
 const params = new URLSearchParams(window.location.search);
 const isDebug = params.has('debug');
@@ -51,15 +56,11 @@ if (isDebug) {
     });
 }
 
-async function startGame() {
-    if (document.fonts?.load) {
-        await document.fonts.load('16px "JungleAdventurer"');
-    }
-
-    bootGame('app');
-}
-
-startGame();
+ReactDOM.createRoot(document.getElementById('app')).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+);
 
 //* SOCKET *//
 

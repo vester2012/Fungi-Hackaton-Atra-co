@@ -1,5 +1,5 @@
+import { BootScene } from './scenes/BootScene.js';
 import { MainScene } from './scenes/MainScene.js';
-import { MenuScene } from './scenes/MenuScene.js';
 
 export function bootGame(parent) {
   const Phaser = window.Phaser;
@@ -27,15 +27,15 @@ export function bootGame(parent) {
     },
     plugins: {
       scene: SpinePlugin
-        ? [
+          ? [
             {
               key: 'SpinePlugin',
               plugin: SpinePlugin,
               mapping: 'spine'
             }
           ]
-        : []
+          : []
     },
-    scene: [MenuScene, MainScene]
+    scene: [BootScene, MainScene]
   });
 }
