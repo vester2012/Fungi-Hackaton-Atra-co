@@ -549,9 +549,9 @@ export class OwnerNavigator {
 
   getActionDisplayName() {
     if (this.state === "investigate") return "Идет на звук";
-    if (this.state === "chase") return "Гонится";
-    if (this.state === "search") return "Ищет кота";
-    if (this.state === "return") return "Возвращается";
+    // if (this.state === "chase") return "Гонится";
+    // if (this.state === "search") return "Ищет кота";
+    // if (this.state === "return") return "Возвращается";
 
     switch (this.currentActionType) {
       case "computer":
@@ -617,17 +617,19 @@ export class OwnerNavigator {
       this.pathGraphics.strokePath();
     }
 
-    this.visionGraphics.fillStyle(
-      this.state === "chase" ? 0xef4444 : 0x60a5fa,
-      0.08,
-    );
-    this.visionGraphics.fillCircle(this.x, this.y, this.visionRadius);
-    this.visionGraphics.lineStyle(
-      1,
-      this.state === "chase" ? 0xef4444 : 0x60a5fa,
-      0.35,
-    );
-    this.visionGraphics.strokeCircle(this.x, this.y, this.visionRadius);
+    if (this.scene.debugMode) {
+      this.visionGraphics.fillStyle(
+        this.state === "chase" ? 0xef4444 : 0x60a5fa,
+        0.08,
+      );
+      this.visionGraphics.fillCircle(this.x, this.y, this.visionRadius);
+      this.visionGraphics.lineStyle(
+        1,
+        this.state === "chase" ? 0xef4444 : 0x60a5fa,
+        0.35,
+      );
+      this.visionGraphics.strokeCircle(this.x, this.y, this.visionRadius);
+    }
 
     const fillColor = this.getActionColor();
 
