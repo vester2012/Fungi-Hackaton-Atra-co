@@ -378,6 +378,8 @@ export class Character extends Phaser.GameObjects.Container {
     }
 
     this.syncHpText();
+    this.playHitAnimation();
+    this.playDamageSound();
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
