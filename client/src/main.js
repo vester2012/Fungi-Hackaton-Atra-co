@@ -184,8 +184,15 @@ socket.on('hpUpdate', (data) => {
     const playerEntry = players[data.id];
     // Проверяем: есть ли запись, есть ли объект и не уничтожен ли он в Phaser
     if (playerEntry && playerEntry.obj && playerEntry.obj.active) {
+        const prevHp = typeof playerEntry.hp === 'number' ? playerEntry.hp : playerEntry.obj.getHp?.();
         playerEntry.hp = data.hp;
-        playerEntry.obj.setHp(data.hp);
+        if (typeof data.damage === 'number' && data.damage > 0 && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(data.damage, data.hp);
+        } else if (typeof prevHp === 'number' && data.hp < prevHp && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(prevHp - data.hp, data.hp);
+        } else {
+            playerEntry.obj.setHp(data.hp);
+        }
     }
 });
 
