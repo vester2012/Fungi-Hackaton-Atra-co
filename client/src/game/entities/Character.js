@@ -411,14 +411,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.scene.sound.play(key, { volume: 0.2 });
   }
 
-  applyRemoteState(x, y, now = this.scene.time.now) {
+  applyRemoteState(x, y, now = this.scene ? this.scene.time.now : 0) { // [FIX] Безопасный дефолтный аргумент
     const movedX = x - this.x;
     const movedY = y - this.y;
     const isMoving = Math.abs(movedX) > 1;
     this.setPosition(x, y);
     if (movedX !== 0) this.applyFacingDirection(movedX < 0 ? -1 : 1);
 
-    // Не меняем анимации, если игрок атакует, получает урон или делает дэш
     if (!this.isAttacking() && !this.isHit() && !this.dashState.isDashing) {
       if (Math.abs(movedY) > 1) {
         this.setAnimation(movedY < 0 ? 'jump' : 'fly');
@@ -429,8 +428,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.syncAttackHitbox();
   }
 
-  isAttacking() { return this.scene.time.now < this.attackUntil; }
-  isHit() { return this.scene.time.now < this.hitUntil; }
+  isAttacking() {
+    return this.scene ? this.scene.time.now < this.attackUntil : false;
+  }
+
+  isHit() {
+    return this.scene ? this.scene.time.now < this.hitUntil : false;
+  }
   getAttackDamage() { return this.baseDamage; }
   getAttackHitbox() { return this.attackHitbox; }
   getAttackId() { return this.attackId; }

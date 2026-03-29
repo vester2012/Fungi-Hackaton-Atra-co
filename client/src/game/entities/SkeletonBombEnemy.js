@@ -1,5 +1,6 @@
-const Phaser = window.Phaser;
+// File: client/src/game/entities/SkeletonBombEnemy.js
 
+const Phaser = window.Phaser;
 import { Enemy } from "./Enemy.js";
 import { DamagePopup } from "./DamagePopup.js";
 
@@ -33,33 +34,11 @@ export class SkeletonBombEnemy extends Enemy {
     this.hitbox.body.setMaxVelocity(this.moveSpeed, 1200);
   }
 
+  // [FIX] Убран конфликтующий клиентский ИИ. Мы просто отображаем состояние сервера.
   update(time, delta, player) {
-    if (!this.hitbox || !this.hitbox.body) {
-      return;
-    }
+    if (!this.hitbox || !this.hitbox.body) return;
 
     const now = time ?? this.scene.time.now;
-    this.currentPlatform = this.findStandingPlatform();
-
-    if (player) {
-      const playerBody = player.getPhysicsTarget();
-      const distanceToPlayer = Phaser.Math.Distance.Between(this.hitbox.x, this.hitbox.y, playerBody.x, playerBody.y);
-      const seesPlayer = distanceToPlayer <= this.detectionRadius;
-      const distanceX = playerBody.x - this.hitbox.x;
-      const absDistanceX = Math.abs(distanceX);
-
-      this.facingDirection = distanceX >= 0 ? 1 : -1;
-
-      if (seesPlayer && absDistanceX > this.attackStopDistance) {
-        this.moveOnPlatform(this.facingDirection * this.moveSpeed, now);
-      } else if (seesPlayer) {
-        this.hitbox.body.setVelocityX(0);
-      } else {
-        this.updatePatrol(now);
-      }
-    } else {
-      this.updatePatrol(now);
-    }
 
     this.syncAttackZone(now);
     this.syncHpText();
@@ -67,18 +46,12 @@ export class SkeletonBombEnemy extends Enemy {
     this.visual.scaleX = this.facingDirection > 0 ? -Math.abs(this.visual.scaleX) : Math.abs(this.visual.scaleX);
 
     this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
-
-    if (player && this.canAttackPlayer(now, player)) {
-      this.tryAttack(now, player);
-    }
   }
 
   applyServerState(state, time = this.scene.time.now) {
     super.applyServerState(state, time);
 
-    if (!state || !this.visual?.state) {
-      return;
-    }
+    if (!state || !this.visual?.state) return;
 
     this.visual.scaleX = this.facingDirection > 0 ? -Math.abs(this.visual.scaleX) : Math.abs(this.visual.scaleX);
 
@@ -92,59 +65,24 @@ export class SkeletonBombEnemy extends Enemy {
     this.setAnimation(state.state === 'run' ? 'run' : 'idle', true);
   }
 
-  updatePatrol(time) {
-    const bounds = this.getPatrolBounds();
-    const leftBound = bounds.left;
-    const rightBound = bounds.right;
-
-    if (time < this.patrolPauseUntil) {
-      this.hitbox.body.setVelocityX(0);
-      return;
-    }
-
-    if (this.hitbox.x <= leftBound) {
-      this.patrolDirection = 1;
-      this.patrolPauseUntil = time + 220;
-    } else if (this.hitbox.x >= rightBound) {
-      this.patrolDirection = -1;
-      this.patrolPauseUntil = time + 220;
-    }
-
-    this.facingDirection = this.patrolDirection;
-    this.moveOnPlatform(this.patrolDirection * this.moveSpeed * 0.55, time);
-  }
-
   syncAnimation(time) {
-    if (!this.visual?.state) {
-      return;
-    }
+    if (!this.visual?.state) return;
 
     if (this.isAttacking(time)) {
       this.setAnimation('idle', true);
       return;
     }
-
-    const movingHorizontally = Math.abs(this.hitbox.body.velocity.x) > 8;
-    this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
   }
 
   setAnimation(name, loop = true) {
-    if (this.currentAnimation === name) {
-      return;
-    }
-
+    if (this.currentAnimation === name) return;
     this.currentAnimation = name;
     this.visual.state.setAnimation(0, name, loop);
   }
 
   takeDamage(amount, attackId = 0) {
-    if (attackId && this.lastHitByAttackId === attackId) {
-      return false;
-    }
-
-    if (attackId) {
-      this.lastHitByAttackId = attackId;
-    }
+    if (attackId && this.lastHitByAttackId === attackId) return false;
+    if (attackId) this.lastHitByAttackId = attackId;
 
     this.hp = Math.max(0, this.hp - amount);
     this.visual.setAlpha(0.55);
@@ -166,63 +104,5 @@ export class SkeletonBombEnemy extends Enemy {
     });
 
     return true;
-  }
-
-  findStandingPlatform() {
-    const body = this.hitbox.body;
-    if (!body || !this.scene.platforms) {
-      return null;
-    }
-
-    return this.scene.platforms.getChildren().find((platform) => {
-      const platformBody = platform.body;
-      if (!platformBody) {
-        return false;
-      }
-
-      const isOnTop = Math.abs(body.bottom - platformBody.top) <= 10;
-      const overlapsX = body.right > platformBody.left + this.platformEdgeMargin && body.left < platformBody.right - this.platformEdgeMargin;
-
-      return isOnTop && overlapsX;
-    }) ?? null;
-  }
-
-  getPatrolBounds() {
-    if (this.currentPlatform?.body) {
-      return {
-        left: this.currentPlatform.body.left + this.platformEdgeMargin,
-        right: this.currentPlatform.body.right - this.platformEdgeMargin
-      };
-    }
-
-    return {
-      left: this.baseX - this.patrolRadius,
-      right: this.baseX + this.patrolRadius
-    };
-  }
-
-  moveOnPlatform(targetVelocityX, time) {
-    const bounds = this.getPatrolBounds();
-    const halfWidth = this.hitbox.width * 0.5;
-    const nextLeft = this.hitbox.x - halfWidth;
-    const nextRight = this.hitbox.x + halfWidth;
-
-    if (targetVelocityX < 0 && nextLeft <= bounds.left) {
-      this.patrolDirection = 1;
-      this.facingDirection = 1;
-      this.patrolPauseUntil = time + 220;
-      this.hitbox.body.setVelocityX(0);
-      return;
-    }
-
-    if (targetVelocityX > 0 && nextRight >= bounds.right) {
-      this.patrolDirection = -1;
-      this.facingDirection = -1;
-      this.patrolPauseUntil = time + 220;
-      this.hitbox.body.setVelocityX(0);
-      return;
-    }
-
-    this.hitbox.body.setVelocityX(targetVelocityX);
   }
 }

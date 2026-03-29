@@ -1,3 +1,5 @@
+// File: client/src/game/entities/Enemy.js
+
 const Phaser = window.Phaser;
 import { HealthIndicator } from "./HealthIndicator.js";
 import { DamagePopup } from "./DamagePopup.js";
@@ -31,6 +33,9 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.hitbox.body.setSize(76, 116);
     this.hitbox.body.setOffset(0, 0);
 
+    // [FIX] Отключаем гравитацию на клиенте, так как сервер отправляет абсолютный Y
+    this.hitbox.body.setAllowGravity(false);
+
     this.visual = scene.add.rectangle(0, 0, 66, 106, 0xb91c1c, 0.85).setStrokeStyle(3, 0xfca5a5, 1);
     this.add(this.visual);
 
@@ -45,30 +50,17 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   update(time, delta, player) {
-    if (!this.hitbox || !this.hitbox.body) {
-      return;
-    }
-
-    if (player) {
-      const playerBody = player.getPhysicsTarget();
-      this.facingDirection = playerBody.x >= this.hitbox.x ? 1 : -1;
-    }
+    if (!this.hitbox || !this.hitbox.body) return;
 
     this.syncAttackZone(time);
     this.syncHpText();
     this.visual.setFillStyle(this.isAttacking(time) ? 0xf97316 : 0xb91c1c, this.isAttacking(time) ? 1 : 0.85);
 
     this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
-
-    if (player && this.canAttackPlayer(time, player)) {
-      this.tryAttack(time, player);
-    }
   }
 
   applyServerState(state, time = this.scene.time.now) {
-    if (!state || !this.hitbox?.body) {
-      return;
-    }
+    if (!state || !this.hitbox?.body) return;
 
     this.facingDirection = state.facingDirection ?? this.facingDirection;
     this.hp = Phaser.Math.Clamp(state.hp ?? this.hp, 0, this.maxHp);
@@ -112,8 +104,8 @@ export class Enemy extends Phaser.GameObjects.Container {
   canAttackPlayer(time, player) {
     if (time - this.lastAttackAt < this.attackCooldownMs) return false;
     return Phaser.Geom.Intersects.RectangleToRectangle(
-      this.attackZone.getBounds(),
-      player.getPhysicsTarget().getBounds()
+        this.attackZone.getBounds(),
+        player.getPhysicsTarget().getBounds()
     );
   }
 
@@ -172,7 +164,6 @@ export class Enemy extends Phaser.GameObjects.Container {
     if (this.attackZone) this.attackZone.destroy();
 
     if (this.hitbox) {
-      // Удален ручной вызов disableBody
       this.hitbox.destroy();
     }
 

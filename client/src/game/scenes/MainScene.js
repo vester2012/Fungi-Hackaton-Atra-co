@@ -1,3 +1,5 @@
+// File: client/src/game/scenes/MainScene.js
+
 import { Character } from '../entities/Character.js';
 import { Platform } from '../entities/Platform.js';
 import { EnemyManager } from '../managers/EnemyManager.js';
@@ -14,8 +16,8 @@ const WORLD_SCALE = 2;
 export class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
-    console.log(unit_manager.info.players);
     this.createdMinas = false;
+    this.lastNetworkSync = 0; // [FIX] Таймер для ограничения спама пакетами
   }
 
   create() {
@@ -32,12 +34,10 @@ export class MainScene extends Phaser.Scene {
     this.bombaDemage = 0.5;
     this.bombasCount = 0;
 
-    // Базовые массивы для данных из JSON
     this.enemySpawns = [];
     this.positionsForHeart =[];
-    this.spawnPoint = { x: 220 * WORLD_SCALE, y: 650 * WORLD_SCALE }; // Точка по умолчанию
+    this.spawnPoint = { x: 220 * WORLD_SCALE, y: 650 * WORLD_SCALE };
 
-    // Пробуем получить карту из кэша (если она была загружена в MenuScene)
     const levelData = this.cache.json.get('map_1');
 
     if (levelData && levelData.world) {
@@ -57,15 +57,12 @@ export class MainScene extends Phaser.Scene {
     this.zoneManager = new ZoneManager(this);
     this.parallax = new ParallaxBackground(this, 'sky_layer_', 8);
 
-    // ПОСТРОЕНИЕ УРОВНЯ
     if (levelData) {
       this.buildLevelFromJson(levelData);
     } else {
-      console.warn('level_map.json не найден! Загружена стандартная карта.');
       this.buildFallbackLevel();
     }
 
-    // Инициализация персонажа на точке спавна
     this.createCharacter();
 
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
@@ -78,8 +75,6 @@ export class MainScene extends Phaser.Scene {
     this.containerForBust = this.add.container(0, 0);
     this.setRandomPosForBlackHoles();
     this.generateHearts();
-    // this.createMines();
-    //this.createBombas();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
@@ -87,9 +82,7 @@ export class MainScene extends Phaser.Scene {
       color: '#f8fafc'
     }).setOrigin(0.5).setScrollFactor(0);
 
-    // UI Возврата
     const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1).setInteractive({ useHandCursor: true }).setScrollFactor(0);
-
     const backLabel = this.add.text(viewWidth * 0.5, viewHeight - 90, 'Back To Menu', {
       fontFamily: 'JungleAdventurer',
       fontSize: '24px',
@@ -97,14 +90,62 @@ export class MainScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0);
 
     backButton.on('pointerover', () => backButton.setFillStyle(0xfbbf24, 1))
-      .on('pointerout', () => backButton.setFillStyle(0xf59e0b, 1))
-      .on('pointerdown', () => {
-        this.scene.start('MenuScene');
-      });
+        .on('pointerout', () => backButton.setFillStyle(0xf59e0b, 1))
+        .on('pointerdown', () => {
+          this.handleCharacterDeath(); // Используем этот же метод для чистого выхода
+        });
 
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
     this.createDebugZoomControls(viewWidth);
+
+    // [FIX] Подключаем критические слушатели для удаления призраков и синхронизации
+    this.setupSocketListeners();
+  }
+
+  // [FIX] Настройка слушателей сокетов прямо в сцене
+  setupSocketListeners() {
+    if (!unit_manager.socket) return;
+
+    // Кто-то вышел
+    unit_manager.socket.on('playerDisconnected', (id) => {
+      const p = unit_manager.info.players[id];
+      if (p && p.obj) {
+        p.obj.destroy(); // Уничтожаем физический спрайт (УБИРАЕТ ПРИЗРАКОВ)
+      }
+      delete unit_manager.info.players[id];
+    });
+
+    // Массив всех игроков (приходит при подключении)
+    unit_manager.socket.on('currentPlayers', (players) => {
+      for (const [id, data] of Object.entries(players)) {
+        if (id === unit_manager.my_id) continue;
+        if (!unit_manager.info.players[id]) {
+          unit_manager.info.players[id] = data;
+        }
+      }
+    });
+
+    // Новый игрок
+    unit_manager.socket.on('newPlayer', (player) => {
+      if (player.id !== unit_manager.my_id) {
+        unit_manager.info.players[player.id] = player;
+      }
+    });
+
+    // Движение других
+    unit_manager.socket.on('playerMoved', (player) => {
+      if (player.id !== unit_manager.my_id && unit_manager.info.players[player.id]) {
+        unit_manager.info.players[player.id].x = player.x;
+        unit_manager.info.players[player.id].y = player.y;
+        unit_manager.info.players[player.id].hp = player.hp;
+      }
+    });
+
+    // Враги
+    unit_manager.socket.on('enemiesState', (enemies) => {
+      unit_manager.info.enemies = enemies;
+    });
   }
 
   // --- ИНТЕГРАЦИЯ РЕДАКТОРА УРОВНЕЙ ---
@@ -115,7 +156,6 @@ export class MainScene extends Phaser.Scene {
     const dropThroughSoil = 0x334155;
     const dropThroughGrass = 0x475569;
 
-    // 1. Рисуем Платформы и Зоны
     levelData.platforms.forEach(p => {
       const x = p.centerX;
       const y = p.centerY;
@@ -123,7 +163,6 @@ export class MainScene extends Phaser.Scene {
       const h = p.height;
 
       if (p.type === 'solid') {
-        // top-left координаты для графики
         this.drawPlatform(graphics, x - w/2, y - h/2, w, h, soil, grass);
         this.addPlatformBody(x, y, w, h, { type: Platform.TYPES.SOLID });
       }
@@ -136,7 +175,6 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    // 2. Расставляем Точки (Спавны, Враги, Лут)
     let enemyIdx = 1;
     levelData.points.forEach(pt => {
       if (pt.type === 'enemy') {
@@ -150,19 +188,16 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    // Если на карте забыли поставить сердца, добавим одно по умолчанию, чтобы код не упал
     if (this.positionsForHeart.length === 0) {
       this.positionsForHeart.push({ x: this.worldWidth / 2, y: this.worldHeight / 2, active: false });
     }
   }
 
-  // --- СТАРАЯ ХАРДКОД-КАРТА (FALLBACK) ---
   buildFallbackLevel() {
     const s = WORLD_SCALE;
     const graphics = this.add.graphics();
     const soil = 0x59412f; const grass = 0x7cb342; const rock = 0x7f8c8d;
 
-    // Рисуем старую графику
     this.drawPlatform(graphics, 0, this.worldHeight - 170 * s, this.worldWidth, 170 * s, soil, grass);
     this.drawPlatform(graphics, 150 * s, 700 * s, 330 * s, 58 * s, soil, grass);
     this.drawPlatform(graphics, 430 * s, 610 * s, 220 * s, 48 * s, soil, grass);
@@ -185,7 +220,6 @@ export class MainScene extends Phaser.Scene {
     graphics.fillRoundedRect(1742 * s, 610 * s, 94 * s, 82 * s, 14 * s);
     graphics.fillRoundedRect(576 * s, 272 * s, 62 * s, 68 * s, 12 * s);
 
-    // Старые коллайдеры
     this.addPlatformBody(this.worldWidth * 0.5, this.worldHeight - 85 * s, this.worldWidth, 170 * s, { type: Platform.TYPES.SOLID });
     this.addPlatformBody(315 * s, 729 * s, 330 * s, 58 * s, { type: Platform.TYPES.DROP_THROUGH });
     this.addPlatformBody(540 * s, 634 * s, 220 * s, 48 * s, { type: Platform.TYPES.DROP_THROUGH });
@@ -206,11 +240,9 @@ export class MainScene extends Phaser.Scene {
     this.addPlatformBody(1789 * s, 651 * s, 94 * s, 82 * s, { type: Platform.TYPES.SOLID });
     this.addPlatformBody(607 * s, 306 * s, 62 * s, 68 * s, { type: Platform.TYPES.SOLID });
 
-    // Старые Зоны скольжения
     this.zoneManager.addZone(new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, { direction: -1, debug: true }));
     this.zoneManager.addZone(new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, { direction: 1, debug: true }));
 
-    // Старые Спавны
     this.enemySpawns =[
       { id: 'enemy-1', x: 360 * s, y: 650 * s, type: 'ground' },
       { id: 'enemy-2', x: 1120 * s, y: 580 * s, type: 'ground' },
@@ -235,7 +267,7 @@ export class MainScene extends Phaser.Scene {
       {x: 850 * s, y: 515 * s, active: false}
     ];
 
-     this.positionsForBombas =[
+    this.positionsForBombas =[
       {x: 600 * s, y: 890 * s, active: false},
       {x: 300 * s, y: 890 * s, active: false},
       {x: 1000 * s, y: 890 * s, active: false},
@@ -257,11 +289,17 @@ export class MainScene extends Phaser.Scene {
       playerState.hp = this.character.getHp();
       unit_manager.info.players[unit_manager.my_id] = playerState;
 
-      unit_manager.socket.emit('playerMovement', {
-        x: this.character.x,
-        y: this.character.y,
-        hp: this.character.getHp()
-      });
+      // [FIX] Спасаем сервер от DDoS! Ограничиваем рассылку до 20 FPS (каждые 50 мс)
+      if (time - this.lastNetworkSync > 50) {
+        this.lastNetworkSync = time;
+        if (unit_manager.socket) {
+          unit_manager.socket.emit('playerMovement', {
+            x: this.character.x,
+            y: this.character.y,
+            hp: this.character.getHp()
+          });
+        }
+      }
       this.parallax.update(this.cameras.main);
     }
 
@@ -277,7 +315,9 @@ export class MainScene extends Phaser.Scene {
     let players = unit_manager.info.players;
     for (const [id, data] of Object.entries(players)) {
       if (id !== unit_manager.my_id) {
-        if (!data.obj) {
+        // [FIX] Добавлена проверка !data.obj.scene
+        // Если объект остался от прошлой сессии и был уничтожен, мы создадим его заново
+        if (!data.obj || !data.obj.scene) {
           data.obj = this.createEnemy();
           if (data.username) data.obj.healthIndicator.setNickname(data.username);
         }
@@ -289,13 +329,11 @@ export class MainScene extends Phaser.Scene {
         data.obj.applyRemoteState(data.x, data.y, time);
         if (typeof data.hp === 'number') data.obj.setHp(data.hp);
 
-        // Обработка удаленной атаки
         if (data.pendingAttackId && data.pendingAttackId !== data.lastPlayedAttackId) {
           data.lastPlayedAttackId = data.pendingAttackId;
           data.obj.playRemoteAttack(time);
         }
 
-        // Обработка удаленного дэша
         if (data.pendingAction === 'dash') {
           data.obj.playRemoteDash(data.actionDirX, data.actionDirY);
           data.pendingAction = null;
@@ -304,15 +342,14 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+
   updateSocketInfo() {
     let players = unit_manager.info.players;
     let str = '';
-
-    // Перебор entries
-    for (const [key, value] of Object.entries(players)) {
+    for (const[key, value] of Object.entries(players)) {
       str += `id:${players[key].id}   hp:${players[key].hp} (${players[key].x}:${players[key].y})` + '\n'
     }
-      unit_manager.textRoomInfo?.setText("info socket:" + "\n" + str)
+    if (unit_manager.textRoomInfo) unit_manager.textRoomInfo.setText("info socket:" + "\n" + str)
   }
 
   checkCollision(rect1, rect2) {
@@ -329,7 +366,7 @@ export class MainScene extends Phaser.Scene {
 
   getCollisionAttack() {
     const otherPlayers = utils.parsePlayersToArray(unit_manager.info.players)
-      .filter((player) => player.id !== unit_manager.my_id && player.obj?.hitbox);
+        .filter((player) => player.id !== unit_manager.my_id && player.obj?.hitbox);
 
     const attackRect = this.character.getAttackHitbox().getBounds();
 
@@ -353,17 +390,14 @@ export class MainScene extends Phaser.Scene {
   createCharacter() {
     const playerState = unit_manager.info.players[unit_manager.my_id] || { id: unit_manager.my_id };
 
-    // Сначала создаем объект
     this.character = new Character(this, playerState.x ?? this.spawnPoint.x, playerState.y ?? this.spawnPoint.y, {
       showStats: true,
       nickname: playerState.username || 'Player'
     });
 
-    // Красим своего персонажа цветом из localStorage
     const myTint = parseInt(localStorage.getItem('player_tint')) || 0xffffff;
     this.character.setSlotColor('body', myTint);
 
-    // Сохраняем в стейт, чтобы сервер знал наш цвет
     playerState.tint = myTint;
     playerState.obj = this.character;
     playerState.hp = this.character.getHp();
@@ -381,11 +415,9 @@ export class MainScene extends Phaser.Scene {
 
   updateEnemiesBot(time, delta) {
     if (!this.character) return;
-
     const attackId = this.character.getAttackId();
     const isPlayerAttacking = this.character.isAttacking();
     const playerAttackBounds = isPlayerAttacking ? this.character.getAttackHitbox().getBounds() : null;
-
     this.enemyManager?.handlePlayerAttack(playerAttackBounds, attackId, this.character.getAttackDamage());
   }
 
@@ -393,18 +425,32 @@ export class MainScene extends Phaser.Scene {
     if (!this.character || this.isReturningToMenu || !this.character.isDead()) return;
 
     this.isReturningToMenu = true;
-    if (unit_manager.socket) unit_manager.socket.emit('playerDied');
+    if (unit_manager.socket) {
+      unit_manager.socket.off('playerDisconnected');
+      unit_manager.socket.off('currentPlayers');
+      unit_manager.socket.off('newPlayer');
+      unit_manager.socket.off('playerMoved');
+      unit_manager.socket.off('enemiesState');
+      unit_manager.socket.emit('playerDied');
+    }
 
     this.cameras.main.stopFollow();
 
-    // Очищаем объект в менеджере
     if (unit_manager.info.players[unit_manager.my_id]) {
       unit_manager.info.players[unit_manager.my_id].obj = null;
-      // ВАЖНО: не удаляйте поле .tint, чтобы сервер его помнил!
     }
 
     this.character.destroy();
     this.character = null;
+
+    // [FIX] Очищаем ссылки на объекты после их уничтожения!
+    for (const [id, data] of Object.entries(unit_manager.info.players)) {
+      if (data.obj) {
+        data.obj.destroy();
+        data.obj = null; // <--- Вот этой строки не хватало!
+      }
+    }
+
     this.scene.start('MenuScene');
   }
 
@@ -434,7 +480,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   createDebugZoomControls(viewWidth) {
-
     unit_manager.textRoomInfo = this.add.text(200, 42, 'Zoom', {
       fontFamily: 'JungleAdventurer',
       fontSize: '20px',
@@ -466,8 +511,8 @@ export class MainScene extends Phaser.Scene {
     const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95).setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
     const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' }).setOrigin(0.5).setScrollFactor(0);
     button.on('pointerover', () => button.setFillStyle(0x475569, 0.98))
-          .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
-          .on('pointerdown', onClick);
+        .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
+        .on('pointerdown', onClick);
     return { button, label: text };
   }
 
@@ -491,28 +536,19 @@ export class MainScene extends Phaser.Scene {
     this.blackHoleZone.body.setImmovable(true);
 
     if (this.character) {
-        this.physics.add.overlap(this.character.getPhysicsTarget(), this.blackHoleZone, this.onBlackHoleTouch, null, this);
+      this.physics.add.overlap(this.character.getPhysicsTarget(), this.blackHoleZone, this.onBlackHoleTouch, null, this);
     }
   }
 
   onBlackHoleTouch(characterBody, holeZone) {
     if (this.isBlackHoleTriggered) return;
     this.isBlackHoleTriggered = true;
-    console.log('Персонаж коснулся черной дыры');
 
     const target = this.character.getPhysicsTarget();
-
     const x = Phaser.Math.Between(100, this.worldWidth - 100);
     const y = Phaser.Math.Between(100, this.worldHeight - 600);
 
-    // телепорт
-    this.tweens.add({
-      targets: this.character,
-      alpha: 0,
-      scaleX: 0.1,
-      scaleY: 0.1,
-      duration: 300
-    });
+    this.tweens.add({ targets: this.character, alpha: 0, scaleX: 0.1, scaleY: 0.1, duration: 300 });
     this.tweens.add({
       targets: target,
       alpha: 0,
@@ -527,20 +563,16 @@ export class MainScene extends Phaser.Scene {
   }
 
   setRandomPosForBlackHoles(){
-    const freePositionsBottom = [{x: 1750 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE}];
-    const freePositionsTop = [{x: 1200 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1700 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1400 * WORLD_SCALE, y: 490 * WORLD_SCALE}, {x: 1000 * WORLD_SCALE, y: 560 * WORLD_SCALE}, {x: 1800 * WORLD_SCALE, y: 100 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 190 * WORLD_SCALE}, {x: 850 * WORLD_SCALE, y: 350 * WORLD_SCALE}, {x: 580 * WORLD_SCALE, y: 450 * WORLD_SCALE}];
+    const freePositionsBottom =[{x: 1750 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE}];
+    const freePositionsTop =[{x: 1200 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1700 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1400 * WORLD_SCALE, y: 490 * WORLD_SCALE}, {x: 1000 * WORLD_SCALE, y: 560 * WORLD_SCALE}, {x: 1800 * WORLD_SCALE, y: 100 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 190 * WORLD_SCALE}, {x: 850 * WORLD_SCALE, y: 350 * WORLD_SCALE}, {x: 580 * WORLD_SCALE, y: 450 * WORLD_SCALE}];
 
     const posBottom = Phaser.Utils.Array.GetRandom(freePositionsBottom);
     this.createBlackHole({x: posBottom.x, y: posBottom.y});
 
     const shuffled = Phaser.Utils.Array.Shuffle([...freePositionsTop]);
-    const pos1 = shuffled[0];
-    const pos2 = shuffled[1];
-    const pos3 = shuffled[2];
-
-    this.createBlackHole({x: pos1.x, y: pos1.y});
-    this.createBlackHole({x: pos2.x, y: pos2.y});
-    this.createBlackHole({x: pos3.x, y: pos3.y});
+    this.createBlackHole({x: shuffled[0].x, y: shuffled[0].y});
+    this.createBlackHole({x: shuffled[1].x, y: shuffled[1].y});
+    this.createBlackHole({x: shuffled[2].x, y: shuffled[2].y});
   }
 
   generateHearts(delayedTime = 0) {
@@ -562,7 +594,6 @@ export class MainScene extends Phaser.Scene {
     let heart;
     const freePositions = this.positionsForHeart.filter(p => !p.active);
     if (freePositions.length > 0) {
-
       const pos = Phaser.Utils.Array.GetRandom(freePositions);
       pos.active = true;
       heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
@@ -572,30 +603,17 @@ export class MainScene extends Phaser.Scene {
       this.addPhysicForNewHeart(heart);
 
       heart.pulseTween = this.tweens.add({
-        targets: heart,
-        scaleX: 0.28,
-        scaleY: 0.28,
-        duration: 300,
-        ease: 'Sine.inOut',
-        yoyo: true,
-        repeat: -1 // бесконечно
+        targets: heart, scaleX: 0.28, scaleY: 0.28, duration: 300,
+        ease: 'Sine.inOut', yoyo: true, repeat: -1
       });
     }
   }
 
   addPhysicForNewHeart(heart){
-    const heartZone = this.add.zone(
-      heart.x,
-      heart.y,
-      10 * WORLD_SCALE,
-      10 * WORLD_SCALE
-    );
-
+    const heartZone = this.add.zone(heart.x, heart.y, 10 * WORLD_SCALE, 10 * WORLD_SCALE);
     this.physics.add.existing(heartZone);
-
     heartZone.body.setAllowGravity(false);
     heartZone.body.setImmovable(true);
-
     if (this.character) {
       heartZone.overlapRef = this.physics.add.overlap(this.character.getPhysicsTarget(), heartZone, this.onHeartTouch.bind(this, heart, heartZone), null, this);
     }
@@ -603,42 +621,22 @@ export class MainScene extends Phaser.Scene {
 
   onHeartTouch(heart, heartZone){
     if (heart.heartTouched) return;
-  
     heart.heartTouched = true;
-    console.log("heartTouched");
 
-    if (heartZone.body) {
-      heartZone.body.enable = false;
-    }
-  
-    // восстанавливаем hp
+    if (heartZone.body) heartZone.body.enable = false;
+
     const curHp = this.character.getHp();
     const maxHp = this.character.getMaxHp();
     ((maxHp - curHp) >= this.heartHealing) ? this.character.setHp(curHp + this.heartHealing) : this.character.setHp(maxHp);
 
-    this.tweens.add({
-      targets: this.character,
-      scaleX: 1.5,
-      scaleY: 1.7,
-      duration: 150,
-      ease: 'Cubic.in',
-      yoyo: true
-    });
+    this.tweens.add({ targets: this.character, scaleX: 1.5, scaleY: 1.7, duration: 150, ease: 'Cubic.in', yoyo: true });
 
-    if (heartZone.overlapRef) {
-        heartZone.overlapRef.destroy();
-        heartZone.overlapRef = null;
-    }
-    if (heartZone.body) {
-        heartZone.body.destroy();
-    }
-    heartZone.heart = null;
+    if (heartZone.overlapRef) heartZone.overlapRef.destroy();
+    if (heartZone.body) heartZone.body.destroy();
     heartZone.destroy();
 
     this.tweens.add({
-      targets: heart,
-      alpha: 0,
-      duration: 300,
+      targets: heart, alpha: 0, duration: 300,
       onComplete: () => {
         this.hearts--;
         if (heart) {
@@ -648,161 +646,5 @@ export class MainScene extends Phaser.Scene {
         }
       }
     });
-
-  }
-
-  createMines(){
-     if(this.createdMinas || this.minas>2) return;
-     this.createdMinas = true;
-     this.minas = 3;
-     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForMines]);
-     const pos1 = shuffled[0];
-     const pos2 = shuffled[1];
-     const pos3 = shuffled[2];
-
-     const mina1 = this.add.image(pos1.x, pos1.y, 'mina').setScale(0.13);
-     this.containerForBust.add(mina1);
-     const mina2 = this.add.image(pos2.x, pos2.y, 'mina').setScale(0.13);
-     this.containerForBust.add(mina2);
-     const mina3 = this.add.image(pos3.x, pos3.y, 'mina').setScale(0.13);
-     this.containerForBust.add(mina3);
-     this.addPhysicForNewMina(mina1);
-     this.addPhysicForNewMina(mina2);
-     this.addPhysicForNewMina(mina3);
-  }
-
-  addPhysicForNewMina(mina){
-    const minaZone = this.add.zone(
-      mina.x,
-      mina.y,
-      8 * WORLD_SCALE,
-      8 * WORLD_SCALE
-    );
-
-    this.physics.add.existing(minaZone);
-
-    minaZone.body.setAllowGravity(false);
-    minaZone.body.setImmovable(true);
-
-    if (this.character) {
-      minaZone.overlapRef = this.physics.add.overlap(this.character.getPhysicsTarget(), minaZone, this.onMinaTouch.bind(this, mina, minaZone), null, this);
-    }
-  }
-
-  onMinaTouch(mina, minaZone){
-    if (mina.minaTouched) return;
-  
-    mina.minaTouched = true;
-    console.log("minaTouched");
-
-    if (minaZone.body) {
-      minaZone.body.enable = false;
-    }
-    
-    // удаляем hp
-    const curHp = this.character.getHp();
-    const nextHp = Math.round(curHp*this.persentOfMina);
-    this.character.setHp(nextHp);
-
-    if (minaZone.overlapRef) {
-        minaZone.overlapRef.destroy();
-        minaZone.overlapRef = null;
-    }
-    if (minaZone.body) {
-        minaZone.body.destroy();
-    }
-    
-    minaZone.destroy();
-     // взрыв ???
-    // this.animMina = this.add.spine(mina.x, mina.y, 'dust_SPO', 'idle', false);
-    this.animMina.setScale(3);
-    this.animMina.setDepth(9999);
-    // прячем мину
-    this.tweens.add({
-      targets: mina,
-      alpha: 0,
-      duration: 400,
-      onComplete: () => {
-        if (mina) {
-          mina.destroy();
-        }
-      }
-    });
-  }
-
-  createBombas(){
-     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForBombas]);
-     const pos1 = shuffled[0];
-     const pos2 = shuffled[1];
-     const pos3 = shuffled[2];
-
-     const bomba1 = this.add.image(pos1.x, pos1.y, 'bomba').setScale(0.13);
-     this.containerForBust.add(bomba1);
-     const bomba2 = this.add.image(pos2.x, pos2.y, 'bomba').setScale(0.13);
-     this.containerForBust.add(bomba2);
-     const bomba3 = this.add.image(pos3.x, pos3.y, 'bomba').setScale(0.13);
-     this.containerForBust.add(bomba3);
-     this.addPhysicForNewBomba(bomba1);
-     this.addPhysicForNewBomba(bomba2);
-     this.addPhysicForNewBomba(bomba3);
-  }
-
-  addPhysicForNewBomba(bomba){
-    const bombaZone = this.add.zone(
-      bomba.x,
-      bomba.y,
-      10 * WORLD_SCALE,
-      10 * WORLD_SCALE
-    );
-
-    this.physics.add.existing(bombaZone);
-
-    bombaZone.body.setAllowGravity(false);
-    bombaZone.body.setImmovable(true);
-
-    if (this.character) {
-      this.physics.add.overlap(this.character.getPhysicsTarget(), bombaZone, this.onBombaTouch.bind(this, bomba, bombaZone), null, this);
-    }
-  }
-
-  onBombaTouch(bomba, bombaZone){
-    if (this.bombaTouched) return;
-  
-    this.bombaTouched = true;
-    console.log("bombaTouched");
-    
-
-    if (bombaZone.overlapRef) {
-        bombaZone.overlapRef.destroy();
-        bombaZone.overlapRef = null;
-    }
-    if (bombaZone.body) {
-        bombaZone.body.destroy();
-    }
-    
-    bombaZone.destroy();
-    // добавляем в счетчик бомб
-    this.bombasCount++;
-
-    // прячем бомбу
-    this.tweens.add({
-      targets: bomba,
-      alpha: 0,
-      duration: 300,
-      onComplete: () => {
-        if (bomba) {
-          bomba.destroy();
-        }
-        this.bombaTouched = false;
-      }
-    });
-  }
-
-  toUseBomba(){
-    if(this.bombasCount === 0) return;
-    this.bombasCount--;
-    // анимация кидания бомбы
-
-    // hp врага падает на параметр this.bombaDemage
   }
 }

@@ -1,11 +1,12 @@
+// File: server/src/index.js
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid'); // Если нет uuid, используйте Math.random().toString(36)
+const { v4: uuidv4 } = require('uuid');
 
-const setupSocketHandlers = require('./soket/main');
-const {getPlayerDamage} = require("./distributions/player_distribution"); // Импортируем наш коорддинатор
+const {getPlayerDamage} = require("./distributions/player_distribution");
 const {
   ENEMY_TICK_MS,
   createRoomEnemies,
@@ -18,82 +19,34 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 const PATH_PUBLIC = path.resolve(__dirname, '../../client/dist');
-const SPAWN_POINTS = [
-  { x: 220, y: 650 },
-  { x: 315, y: 650 },
-  { x: 540, y: 560 },
-  { x: 785, y: 485 },
-  { x: 1050, y: 410 },
-  { x: 1325, y: 340 },
-  { x: 1590, y: 280 },
-  { x: 1130, y: 680 },
-  { x: 1450, y: 570 }
+const SPAWN_POINTS =[
+  { x: 220, y: 650 }, { x: 315, y: 650 }, { x: 540, y: 560 },
+  { x: 785, y: 485 }, { x: 1050, y: 410 }, { x: 1325, y: 340 },
+  { x: 1590, y: 280 }, { x: 1130, y: 680 }, { x: 1450, y: 570 }
 ];
 app.use(express.static(PATH_PUBLIC));
 
-// Хранилища
-const activePlayers = {}; // Кто сейчас в сети (socket.id => data)
-const sessionDatabase = {}; // Все когда-либо заходившие (sessionId => data)
+const activePlayers = {};
+const sessionDatabase = {};
 let idCounter = 0;
 
-let arrQueue = [
-  {
-    totalLots: 4,
-    remainLots: 0,
-    players: []
-  }
+let arrQueue =[
+  { totalLots: 4, remainLots: 0, players: [] }
 ];
 
-const rooms = [
-  {
-    info: {
-      name: 'sandbox',
-      id: ++idCounter,
-      lifespan: -1
-    },
-    password: ''
-  },
-  {
-    info: {
-      name: 'teamAtraCo',
-      id: ++idCounter,
-      lifespan: -1
-    },
-    password: 'tune123'
-  }
+const rooms =[
+  { info: { name: 'sandbox', id: ++idCounter, lifespan: -1 }, password: '' },
+  { info: { name: 'teamAtraCo', id: ++idCounter, lifespan: -1 }, password: 'tune123' }
 ];
-
-const animals = [
-  {
-    name: 'корови',
-    id: 0,
-    hp: 100,
-    damage: 20
-  },
-  {
-    name: 'тупорыба',
-    atlas: 'fish',
-    id: 1,
-    hp: 100,
-    damage: 20
-  }
-];
-
 
 function getRandomSpawnPoint() {
   const index = Math.floor(Math.random() * SPAWN_POINTS.length);
   return { ...SPAWN_POINTS[index] };
 }
 
-
-
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] }
+  cors: { origin: "*", methods:["GET", "POST"] } // [FIX] Разрешаем любые CORS для дебага на джеме
 });
-
-//setupSocketHandlers(io);
-
-//#region old_soket
 
 io.on('connection', (socket) => {
 
@@ -104,7 +57,7 @@ io.on('connection', (socket) => {
 
     if (sessionId && sessionDatabase[sessionId]) {
       player = sessionDatabase[sessionId];
-      if (data.tint) player.tint = data.tint; // Обновляем цвет, если пришел новый
+      if (data.tint) player.tint = data.tint;
     } else {
       sessionId = uuidv4();
       player = {
@@ -118,7 +71,6 @@ io.on('connection', (socket) => {
       sessionDatabase[sessionId] = player;
     }
 
-    // Привязываем актуальные данные к сессии
     player.id = socket.id;
     player.x = spawnPoint.x;
     player.y = spawnPoint.y;
@@ -130,22 +82,17 @@ io.on('connection', (socket) => {
       username: player.username,
       hp: player.hp,
       damage: player.damage,
-      tint: player.tint, // Отправляем тинт обратно
+      tint: player.tint,
       x: player.x,
       y: player.y
     });
-
-    socket.emit('currentEnemies', {});
   });
 
-  // Все остальные события используют activePlayers[socket.id]
   socket.on('mm', (arg) => {
     const { sid, numPlayersOfRoom } = arg;
-
     let queue = arrQueue.find(q => q.totalLots === numPlayersOfRoom && !q.isStarted);
 
     if (!queue) {
-      // Создаем новую комнату
       let listRooms = createRoom({sid, roomName: 'mm' + sid, roomPass: sid});
       let room = rooms[rooms.length - 1];
 
@@ -159,47 +106,27 @@ io.on('connection', (socket) => {
       };
       arrQueue.push(queue);
 
-
-      socket.join(queue.idRoom);
       joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
 
       let list_rooms = rooms.map(obj => obj.info);
       socket.emit('update_list_rooms', { list_rooms });
     } else {
-      // Игрок присоединяется к существующей очереди
       queue.remainLots--;
       queue.players.push(sid);
 
-      // // ВАЖНО: Присоединяем текущий сокет к комнате
-
-
-      // Вызываем вашу функцию логики (если она делает socket.join внутри, убедитесь в этом)
       joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
-
-      socket.join(queue.idRoom);
 
       if (queue.remainLots === 0) {
         queue.isStarted = true;
-
-        // ИСПРАВЛЕНИЕ: Отправляем ВСЕМ в этой комнате
-        // Используйте io.to(...), а не socket.emit(...)
-
-        //io.to(queue.idRoom).emit('currentPlayers', {huy:1});
         io.to(queue.idRoom).emit('mm_is_already', {
           idRoom: queue.idRoom,
           passRoom: queue.passRoom
         });
-        getPlayersAndEnemiesByRoom(io, '_queue', rooms.find(room => room.info.id === queue.idRoom))
-
         arrQueue = arrQueue.filter(el => el.idRoom !== queue.idRoom);
       }
     }
-
-    // Это событие тоже можно отправить всей комнате, чтобы все видели, что кто-то зашел
-    io.to(queue.idRoom).emit('mm_newPlayer', { queue });
   });
 
-  // Все остальные события используют activePlayers[socket.id]
   socket.on('create_room', (arg) => {
     let list_rooms = createRoom(arg);
     socket.emit('update_list_rooms', { list_rooms });
@@ -207,29 +134,19 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', (data) => {
     joinToRoom(socket, data);
-    getPlayersAndEnemiesByRoom(io, '_queue', rooms.find(room => room.info.id === data.idRoom))
-
   });
 
+  // [FIX] Игрок не удаляется из activePlayers насовсем, чтобы мог переподключиться
   socket.on('playerDied', () => {
     const player = activePlayers[socket.id];
     if (!player) return;
 
-    console.log(`Игрок ${player.username} погиб и удален из активных`);
-
     const roomId = player.roomId;
+    player.roomId = null; // Убираем из комнаты
 
-    // 1. Удаляем игрока из списка активных на сервере,
-    // чтобы он не участвовал в рассылках позиций
-    delete activePlayers[socket.id];
-
-    // 2. Оповещаем комнату, что этот объект игрока нужно уничтожить
-    // Мы используем существующее событие 'playerDisconnected',
-    // так как клиент уже умеет удалять спрайт по этому событию.
     if (roomId) {
       io.to(roomId).emit('playerDisconnected', socket.id);
-    } else {
-      io.emit('playerDisconnected', socket.id);
+      socket.leave(roomId);
     }
   });
 
@@ -241,21 +158,19 @@ io.on('connection', (socket) => {
     player.y = movementData.y;
     if (typeof movementData.hp === 'number') player.hp = movementData.hp;
 
-    // Отправляем только людям в той же комнате
     socket.to(player.roomId).emit('playerMoved', player);
   });
 
   socket.on('playerAttack', (data) => {
     const player = activePlayers[socket.id];
     if (player && player.roomId) {
-      // Отправляем всем в комнату, включая себя (или socket.to если себе не надо)
       io.to(player.roomId).emit('playerAttacked', { attackerId: socket.id, ...data });
     }
   });
+
   socket.on('playerAction', (data) => {
     const player = activePlayers[socket.id];
     if (player && player.roomId) {
-      // Рассылаем всем в комнате, кроме самого отправителя
       socket.to(player.roomId).emit('playerActionReceive', {
         playerId: socket.id,
         action: data.action,
@@ -271,7 +186,6 @@ io.on('connection', (socket) => {
     if (target && player && player.roomId) {
       const damage = getPlayerDamage();
       target.hp = Math.max(0, target.hp - damage);
-      // Рассылка только в текущую комнату
       io.to(player.roomId).emit('hpUpdate', { id: data.targetId, hp: target.hp, attackerId: socket.id, damage });
     }
   });
@@ -285,97 +199,88 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const player = activePlayers[socket.id];
     if (player) {
-      console.log(`Игрок ${player.username} отключился`);
       const roomId = player.roomId;
       delete activePlayers[socket.id];
 
       if (roomId) {
         io.to(roomId).emit('playerDisconnected', socket.id);
-      } else {
-        io.emit('playerDisconnected', socket.id);
+
+        // [FIX] Утечка памяти: удаляем комнату, если она пуста и не дефолтная
+        const room = rooms.find(r => r.info.id === roomId);
+        if (room && room.info.lifespan !== -1) {
+          const playersInRoom = Object.values(activePlayers).filter(p => p.roomId === roomId);
+          if (playersInRoom.length === 0) {
+            const idx = rooms.indexOf(room);
+            if (idx !== -1) rooms.splice(idx, 1);
+          }
+        }
       }
     }
   });
-
 });
 
-function getPlayersAndEnemiesByRoom(io, prefix, room) {
+// [FIX] Передаем `io` в функцию, чтобы отправить данные всем
+function getPlayersAndEnemiesByRoom(ioInstance, prefix, room) {
   const playersInRoom = {};
   Object.values(activePlayers).forEach(p => {
-    if (!room.info)
-      console.log();
     if (p.roomId == room.info.id) playersInRoom[p.id] = p;
   });
-  io.to(room.info.id).emit('currentPlayers', playersInRoom);
-  io.to(room.info.id).emit('currentEnemies', room.enemies);
+
+  ioInstance.to(room.info.id).emit('currentPlayers', playersInRoom);
+  ioInstance.to(room.info.id).emit('currentEnemies', room.enemies);
   return playersInRoom;
 }
+
 function createRoom(arg) {
   const { sid, roomName, roomPass } = arg;
   rooms.push({
-    info: {
-      name: roomName,
-      id: ++idCounter,
-      lifespan: -1
-    },
+    info: { name: roomName, id: ++idCounter, lifespan: 1 }, // 1 = кастомная комната
     created: sid,
     password: roomPass,
     enemies: createRoomEnemies()
   });
-
-
-  let list_rooms = rooms.map(obj => obj.info);
-  return list_rooms;
+  return rooms.map(obj => obj.info);
 }
-function joinToRoom( socket, data, ismm ) {
+
+function joinToRoom(socket, data, ismm) {
   const prefix = ismm ? '_queue' : '';
   const { sid, idRoom, passRoom } = data;
-  const player = sessionDatabase[sid];
+  const playerState = sessionDatabase[sid];
 
-  // Ищем комнату в массиве по ID (приводим к числу, если нужно)
-  const roomIndex = rooms.findIndex(r => r.info.id === idRoom);
+  const roomIndex = rooms.findIndex(r => r.info.id == idRoom);
   const room = rooms[roomIndex];
 
   if (!ismm) {
-    if (!room) {
-      return socket.emit('error_msg', 'Комната не найдена');
-    }
-
-    // Проверяем пароль
-    if (room.password !== "" && room.password !== passRoom) {
-      return socket.emit('error_msg', 'Неверный пароль');
-    }
+    if (!room) return socket.emit('error_msg', 'Комната не найдена');
+    if (room.password !== "" && room.password !== passRoom) return socket.emit('error_msg', 'Неверный пароль');
   }
 
-  if (player) {
-    // 1. Уходим из предыдущей комнаты, если она была
-    if (player.roomId) {
-      socket.leave(player.roomId);
+  if (playerState) {
+    //[FIX] Возвращаем игрока к жизни, если он был "мертв" и удален
+    if (!activePlayers[socket.id]) {
+      activePlayers[socket.id] = playerState;
+      activePlayers[socket.id].id = socket.id;
+      activePlayers[socket.id].hp = 100; // Респаун
     }
 
-    // 2. Привязываем игрока к новой комнате
-    player.roomId = idRoom;
-    socket.join(idRoom);
+    const player = activePlayers[socket.id];
 
-    // 3. Если в этой комнате еще нет своих врагов — создаем их (копируем дефолтных)
-    if (!room.enemies) {
-      room.enemies = createRoomEnemies();
-    }
+    if (player.roomId) socket.leave(player.roomId);
 
-    console.log(`Игрок ${player.username} зашел в комнату ${room.info.name} (${idRoom})`);
+    player.roomId = room.info.id;
+    socket.join(room.info.id);
 
-    // 4. Сообщаем клиенту, что вход успешен
-    socket.emit('joined_room_success' + prefix, { roomId: idRoom });
+    if (!room.enemies) room.enemies = createRoomEnemies();
 
-    // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
+    socket.emit('joined_room_success' + prefix, { roomId: room.info.id });
 
-    getPlayersAndEnemiesByRoom(socket, prefix, room);
-    // Оповещаем остальных ВНУТРИ комнаты
-    socket.to(idRoom).emit('newPlayer' + prefix, player);
+    // [FIX] Здесь раньше был `socket`, теперь передаем `io`, чтобы все в комнате получили данные
+    getPlayersAndEnemiesByRoom(io, prefix, room);
+
+    // Также персонально кидаем остальным новичка
+    socket.to(room.info.id).emit('newPlayer' + prefix, player);
   }
 }
-
-//#endregion
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(PATH_PUBLIC, 'index.html'));
@@ -388,7 +293,6 @@ server.listen(PORT, () => {
 setInterval(() => {
   const now = Date.now();
   const dt = ENEMY_TICK_MS / 1000;
-
   for (const room of rooms) {
     updateRoomEnemies(io, room, activePlayers, now, dt);
   }
