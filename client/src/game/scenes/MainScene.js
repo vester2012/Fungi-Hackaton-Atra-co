@@ -319,24 +319,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   getCollisionAttack() {
-    // 1. Собираем массив врагов (все кроме себя)
-    let otherPlayers = utils.parsePlayersToArray(unit_manager.info.players)
-        .filter(el => el.id !== unit_manager.my_id);
+    const otherPlayers = utils.parsePlayersToArray(unit_manager.info.players)
+      .filter((player) => player.id !== unit_manager.my_id && player.obj?.hitbox);
 
-    // 2. Определяем хитбокс атаки в мировых координатах
-    let attackRect = {
-      x: //this.character.x +
-          this.character.attackHitbox.x,
-      y: //this.character.y +
-          this.character.attackHitbox.y,
-      w: this.character.attackHitbox.width, // ширина зоны удара
-      h: this.character.attackHitbox.height  // высота зоны удара
-    };
+    const attackRect = this.character.getAttackHitbox().getBounds();
 
-    otherPlayers.forEach(player => {
-      // Предположим, что у каждого игрока в объекте есть хитбокс с x, y, w, h
-      // Важно: x и y врага тоже должны быть мировыми координатами!
-      let enemyHitbox = {
+    otherPlayers.forEach((player) => {
+      const enemyHitbox = {
         x: player.obj.hitbox.x,
         y: player.obj.hitbox.y,
         w: player.obj.hitbox.width,
@@ -344,21 +333,8 @@ export class MainScene extends Phaser.Scene {
       };
 
       if (this.checkCollision(attackRect, enemyHitbox)) {
-        console.log("Попал по игроку:", player.id);
-
-        if (typeof player.hp !== 'number') {
-          player.hp = 100;
-        }
-
-        player.hp = Math.max(0, player.hp - 10);
-        if (player.obj?.setHp) {
-          player.obj.setHp(player.hp);
-        }
-
-        // 3. Сообщаем серверу, что мы нанесли урон
         unit_manager.socket.emit('playerHit', {
-          targetId: player.id,
-          damage: 10
+          targetId: player.id
         });
       }
     });
