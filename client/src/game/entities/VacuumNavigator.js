@@ -18,6 +18,10 @@ export class VacuumNavigator {
     this.graphics = scene.add.graphics();
     this.pathGraphics = scene.add.graphics();
 
+    this.isDirtyTrailActive = false;
+    this.dirtyTrailPoints = [];
+    this.maxDirtyTrailPoints = 220;
+
     if (!this.route.length) {
       this.enabled = false;
     }
@@ -25,6 +29,7 @@ export class VacuumNavigator {
 
   update(delta) {
     if (!this.enabled || !this.route.length) {
+      this.updateDirtyTrail();
       this.redraw();
       return;
     }
@@ -38,6 +43,7 @@ export class VacuumNavigator {
 
     if (dist <= 6) {
       this.currentIndex = (this.currentIndex + 1) % this.route.length;
+      this.updateDirtyTrail();
       this.redraw();
       return;
     }
@@ -60,7 +66,45 @@ export class VacuumNavigator {
       this.y = nextY;
     }
 
+    this.updateDirtyTrail();
     this.redraw();
+  }
+
+  activateDirtyTrail() {
+    if (!this.isDirtyTrailActive) {
+      this.isDirtyTrailActive = true;
+      this.dirtyTrailPoints = [{ x: this.x, y: this.y }];
+      return;
+    }
+
+    // если уже грязный, просто продолжаем тянуть след
+    if (!this.dirtyTrailPoints.length) {
+      this.dirtyTrailPoints = [{ x: this.x, y: this.y }];
+    }
+  }
+
+  clearDirtyTrail() {
+    this.isDirtyTrailActive = false;
+    this.dirtyTrailPoints = [];
+  }
+
+  updateDirtyTrail() {
+    if (!this.isDirtyTrailActive) {
+      return;
+    }
+
+    const lastPoint = this.dirtyTrailPoints[this.dirtyTrailPoints.length - 1];
+    const dist = lastPoint
+      ? Phaser.Math.Distance.Between(lastPoint.x, lastPoint.y, this.x, this.y)
+      : Infinity;
+
+    if (!lastPoint || dist >= 8) {
+      this.dirtyTrailPoints.push({ x: this.x, y: this.y });
+    }
+
+    if (this.dirtyTrailPoints.length > this.maxDirtyTrailPoints) {
+      this.dirtyTrailPoints.shift();
+    }
   }
 
   getBodyRect(nextX = this.x, nextY = this.y) {
@@ -76,16 +120,39 @@ export class VacuumNavigator {
     this.graphics.clear();
     this.pathGraphics.clear();
 
-    if (this.route.length > 1) {
-      this.pathGraphics.lineStyle(2, 0x64748b, 0.35);
+    // Постоянный серый маршрут не рисуем.
+    // Рисуем только временно накопившийся грязный след.
+    if (this.dirtyTrailPoints.length > 1) {
+      this.pathGraphics.lineStyle(14, 0x5b3a29, 0.42);
       this.pathGraphics.beginPath();
-      this.pathGraphics.moveTo(this.route[0].x, this.route[0].y);
+      this.pathGraphics.moveTo(
+        this.dirtyTrailPoints[0].x,
+        this.dirtyTrailPoints[0].y,
+      );
 
-      for (let i = 1; i < this.route.length; i++) {
-        this.pathGraphics.lineTo(this.route[i].x, this.route[i].y);
+      for (let i = 1; i < this.dirtyTrailPoints.length; i++) {
+        this.pathGraphics.lineTo(
+          this.dirtyTrailPoints[i].x,
+          this.dirtyTrailPoints[i].y,
+        );
       }
 
-      this.pathGraphics.lineTo(this.route[0].x, this.route[0].y);
+      this.pathGraphics.strokePath();
+
+      this.pathGraphics.lineStyle(8, 0x7a4a2f, 0.86);
+      this.pathGraphics.beginPath();
+      this.pathGraphics.moveTo(
+        this.dirtyTrailPoints[0].x,
+        this.dirtyTrailPoints[0].y,
+      );
+
+      for (let i = 1; i < this.dirtyTrailPoints.length; i++) {
+        this.pathGraphics.lineTo(
+          this.dirtyTrailPoints[i].x,
+          this.dirtyTrailPoints[i].y,
+        );
+      }
+
       this.pathGraphics.strokePath();
     }
 
@@ -97,5 +164,11 @@ export class VacuumNavigator {
 
     this.graphics.fillStyle(0xe2e8f0, 0.9);
     this.graphics.fillCircle(this.x, this.y, 6);
+
+    if (this.isDirtyTrailActive) {
+      this.graphics.fillStyle(0x5b3a29, 0.9);
+      this.graphics.fillCircle(this.x + 7, this.y + 5, 5);
+      this.graphics.fillCircle(this.x - 6, this.y + 3, 4);
+    }
   }
 }

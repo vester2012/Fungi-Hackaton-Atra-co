@@ -601,7 +601,11 @@ export class OwnerNavigator {
 
     this.visionGraphics.clear();
 
-    if (this.path.length > 0 && this.pathIndex < this.path.length) {
+    if (
+      this.scene.debugMode &&
+      this.path.length > 0 &&
+      this.pathIndex < this.path.length
+    ) {
       this.pathGraphics.lineStyle(3, 0x2563eb, 0.35);
       this.pathGraphics.beginPath();
       this.pathGraphics.moveTo(this.x, this.y);

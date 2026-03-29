@@ -119,4 +119,8 @@ export class LitterBoxZone extends BaseZoneObject {
       message: "Неизвестное действие.",
     };
   }
+
+  resetMess() {
+    this.dug = false;
+  }
 }

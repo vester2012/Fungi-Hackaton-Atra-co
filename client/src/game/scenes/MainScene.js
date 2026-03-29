@@ -521,6 +521,8 @@ export class MainScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
+    this.debugMode = false;
+
     this.cameras.main.setBackgroundColor("#1e1e1e");
 
     this.bg = this.add.image(width / 2, height / 2, "apartment");
@@ -556,7 +558,7 @@ export class MainScene extends Phaser.Scene {
 
     this.maxCatCaught = 3;
     this.catCaughtCount = 0;
-    this.roundState = "playing"; // playing | win | lose
+    this.roundState = "playing";
 
     this.catCaughtUntil = 0;
     this.catHomeSpawn = {
@@ -608,117 +610,21 @@ export class MainScene extends Phaser.Scene {
       action2: Phaser.Input.Keyboard.KeyCodes.TWO,
       action3: Phaser.Input.Keyboard.KeyCodes.THREE,
       action4: Phaser.Input.Keyboard.KeyCodes.FOUR,
+      debug: Phaser.Input.Keyboard.KeyCodes.F3,
     });
 
-    this.scoreText = this.add
-      .text(16, 16, "", {
-        fontFamily: "Arial",
-        fontSize: "18px",
-        color: "#111827",
-        backgroundColor: "#ffffffdd",
-        padding: { left: 10, right: 10, top: 6, bottom: 6 },
-      })
-      .setDepth(100);
-
-    this.stateText = this.add
-      .text(16, 92, "", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#111827",
-        backgroundColor: "#ffffffcc",
-        padding: { left: 10, right: 10, top: 6, bottom: 6 },
-      })
-      .setDepth(100);
-
-    this.statusText = this.add
-      .text(916, 0, "", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#111827",
-        backgroundColor: "#ffffffcc",
-        padding: { left: 10, right: 10, top: 6, bottom: 6 },
-      })
-      .setDepth(100);
-
-    this.menuBg = this.add
-      .rectangle(0, 0, 320, 180, 0x111827, 0.92)
-      .setOrigin(0, 0)
-      .setVisible(false)
-      .setDepth(200);
-
-    this.menuText = this.add
-      .text(0, 0, "", {
-        fontFamily: "Arial",
-        fontSize: "18px",
-        color: "#f8fafc",
-        lineSpacing: 8,
-      })
-      .setVisible(false)
-      .setDepth(201);
-
-    this.rageBarBg = this.add
-      .rectangle(420, 28, 420, 22, 0x0f172a, 0.95)
-      .setOrigin(0, 0.5)
-      .setDepth(110);
-
-    this.rageBarFill = this.add
-      .rectangle(420, 28, 0, 22, 0xef4444, 1)
-      .setOrigin(0, 0.5)
-      .setDepth(111);
-
-    this.rageBarLabel = this.add
-      .text(420, 6, "Выбешивание", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#fee2e2",
-        backgroundColor: "#7f1d1dcc",
-        padding: { left: 6, right: 6, top: 2, bottom: 2 },
-      })
-      .setDepth(112);
-
-    this.roundTimerText = this.add
-      .text(width - 16, 16, "", {
-        fontFamily: "Arial",
-        fontSize: "20px",
-        color: "#111827",
-        backgroundColor: "#ffffffdd",
-        padding: { left: 10, right: 10, top: 6, bottom: 6 },
-      })
-      .setOrigin(1, 0)
-      .setDepth(120);
-
-    this.endOverlay = this.add
-      .rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
-      .setDepth(500)
-      .setVisible(false);
-
-    this.endTitle = this.add
-      .text(width / 2, height / 2 - 80, "", {
-        fontFamily: "Arial",
-        fontSize: "54px",
-        color: "#f8fafc",
-        align: "center",
-      })
-      .setOrigin(0.5)
-      .setDepth(501)
-      .setVisible(false);
-
-    this.endStats = this.add
-      .text(width / 2, height / 2 + 10, "", {
-        fontFamily: "Arial",
-        fontSize: "26px",
-        color: "#e2e8f0",
-        align: "center",
-        lineSpacing: 10,
-      })
-      .setOrigin(0.5)
-      .setDepth(501)
-      .setVisible(false);
+    this.createPlayerHud();
+    this.createDebugHud();
 
     this.updateHud();
   }
 
   update(_time, delta) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.debug)) {
+      this.debugMode = !this.debugMode;
+      this.refreshDebugVisibility();
+    }
+
     if (this.roundState !== "playing") {
       this.updateHud();
       return;
@@ -730,6 +636,8 @@ export class MainScene extends Phaser.Scene {
     if (this.vacuum) {
       this.vacuum.update(delta);
     }
+
+    this.updateVacuumDirtyTrailNotice();
 
     this.catState.update(this.time.now);
     this.evidenceSystem.update(this.time.now);
@@ -775,6 +683,383 @@ export class MainScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  updateVacuumDirtyTrailNotice() {
+    if (!this.vacuum || !this.owner) return;
+    if (!this.vacuum.isDirtyTrailActive) return;
+    if (!this.vacuum.dirtyTrailPoints.length) return;
+
+    const noticeRadius = this.owner.visionRadius || 140;
+
+    for (const point of this.vacuum.dirtyTrailPoints) {
+      const dist = Phaser.Math.Distance.Between(
+        this.owner.x,
+        this.owner.y,
+        point.x,
+        point.y,
+      );
+
+      if (dist > noticeRadius) continue;
+
+      this.vacuum.clearDirtyTrail();
+
+      this.rageMeter.add(35);
+      this.ownerState.addAggression(1);
+      this.setStatusMessage(
+        "Хозяин заметил коричневый след от пылесоса!",
+        true,
+      );
+      return;
+    }
+  }
+
+  createPlayerHud() {
+    const { width, height } = this.scale;
+
+    this.uiLayer = this.add.layer().setDepth(1000);
+
+    this.topShadow = this.add
+      .rectangle(width / 2, 0, width, 120, 0x000000, 0.14)
+      .setOrigin(0.5, 0);
+    this.uiLayer.add(this.topShadow);
+
+    this.rageTitle = this.add
+      .text(width / 2, 14, "Выбешивание", {
+        fontFamily: "Arial",
+        fontSize: "20px",
+        fontStyle: "bold",
+        color: "#fff4df",
+        stroke: "#533b2b",
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5, 0);
+    this.uiLayer.add(this.rageTitle);
+
+    this.rageBarShadow = this.add
+      .rectangle(width / 2 + 4, 58 + 6, 340, 24, 0x000000, 0.18)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.rageBarShadow);
+
+    this.rageBarBg = this.add
+      .rectangle(width / 2, 58, 340, 24, 0xf1dfbf, 1)
+      .setStrokeStyle(4, 0x6f553f, 1)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.rageBarBg);
+
+    this.rageBarFill = this.add
+      .rectangle(width / 2 - 170, 58, 0, 24, 0xd86b5f, 1)
+      .setOrigin(0, 0.5);
+    this.uiLayer.add(this.rageBarFill);
+
+    this.rageBarGloss = this.add
+      .rectangle(width / 2 - 170, 54, 0, 8, 0xffffff, 0.28)
+      .setOrigin(0, 0.5);
+    this.uiLayer.add(this.rageBarGloss);
+
+    this.timerPanelShadow = this.add
+      .rectangle(width / 2 + 2, 96 + 4, 180, 46, 0x000000, 0.18)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.timerPanelShadow);
+
+    this.timerPanel = this.add
+      .rectangle(width / 2, 96, 180, 46, 0xe9d0a2, 1)
+      .setStrokeStyle(4, 0x6f553f, 1)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.timerPanel);
+
+    this.timerText = this.add
+      .text(width / 2, 96, "60", {
+        fontFamily: "Arial",
+        fontSize: "24px",
+        fontStyle: "bold",
+        color: "#3a2b20",
+      })
+      .setOrigin(0.5);
+    this.uiLayer.add(this.timerText);
+
+    this.heartsContainer = this.add.container(width - 200, 38);
+    this.hearts = [];
+
+    for (let i = 0; i < 3; i++) {
+      const heart = this.add
+        .text(i * 54, 0, "❤️", {
+          fontSize: "48px",
+          color: "#ff6b6b", // яркий тёплый розово-красный
+          shadow: {
+            offsetX: 2,
+            offsetY: 3,
+            color: "#6b3f35",
+            blur: 4,
+            fill: true,
+          },
+        })
+        .setOrigin(0.5);
+
+      this.heartsContainer.add(heart);
+      this.hearts.push(heart);
+    }
+
+    // === Состояние кота - нижняя панель ===
+    this.bottomPanelShadow = this.add
+      .rectangle(width / 2 + 8, height - 66, width - 140, 92, 0x000000, 0.18)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.bottomPanelShadow);
+
+    this.bottomPanel = this.add
+      .rectangle(width / 2, height - 42, width - 140, 68, 0xf9f0d9, 0.97)
+      .setStrokeStyle(6, 0x6b4a35, 1)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.bottomPanel);
+
+    // Ровное расположение виджетов в одну строку
+    const startX = width * 0.5 - 490;
+    const spacing = 245; // расстояние между карточками
+
+    this.needWidgets = {
+      vomit: this.createNeedWidget(
+        startX,
+        height - 42,
+        "Тошнота",
+        "🤢",
+        0xffa36b,
+      ),
+      pee: this.createNeedWidget(
+        startX + spacing,
+        height - 42,
+        "Пописать",
+        "💧",
+        0xffe36b,
+      ),
+      poop: this.createNeedWidget(
+        startX + spacing * 2,
+        height - 42,
+        "Какать",
+        "💩",
+        0xc78f5e,
+      ),
+      water: this.createNeedWidget(
+        startX + spacing * 3,
+        height - 42,
+        "Вода",
+        "💦",
+        0x7ed6ff,
+      ),
+    };
+
+    Object.values(this.needWidgets).forEach((w) => {
+      this.uiLayer.add(w.container);
+    });
+
+    this.statusBubbleShadow = this.add
+      .rectangle(width / 2 + 4, height - 160 + 6, 420, 44, 0x000000, 0.18)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.statusBubbleShadow);
+
+    this.statusBubble = this.add
+      .rectangle(width / 2, height - 160, 420, 44, 0xe9d0a2, 0.98)
+      .setStrokeStyle(4, 0x6f553f, 1)
+      .setOrigin(0.5);
+    this.uiLayer.add(this.statusBubble);
+
+    this.statusText = this.add
+      .text(width / 2, height - 160, "Игра началась", {
+        fontFamily: "Arial",
+        fontSize: "18px",
+        color: "#3f2f22",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+    this.uiLayer.add(this.statusText);
+
+    this.actionMenuShadow = this.add
+      .rectangle(0, 0, 340, 120, 0x000000, 0.18)
+      .setOrigin(0, 0)
+      .setVisible(false);
+    this.uiLayer.add(this.actionMenuShadow);
+
+    this.actionMenuBg = this.add
+      .rectangle(0, 0, 340, 120, 0xf1dfbf, 0.98)
+      .setOrigin(0, 0)
+      .setStrokeStyle(4, 0x6f553f, 1)
+      .setVisible(false);
+    this.uiLayer.add(this.actionMenuBg);
+
+    this.actionMenuText = this.add
+      .text(0, 0, "", {
+        fontFamily: "Arial",
+        fontSize: "18px",
+        color: "#3d2d22",
+        lineSpacing: 8,
+        fontStyle: "bold",
+      })
+      .setVisible(false);
+    this.uiLayer.add(this.actionMenuText);
+
+    this.endOverlay = this.add
+      .rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
+      .setDepth(1500)
+      .setVisible(false);
+
+    this.endTitle = this.add
+      .text(width / 2, height / 2 - 120, "", {
+        fontFamily: "Arial",
+        fontSize: "56px",
+        fontStyle: "bold",
+        color: "#fff6e8",
+        stroke: "#4a3426",
+        strokeThickness: 8,
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setDepth(1501)
+      .setVisible(false);
+
+    this.endStatsBg = this.add
+      .rectangle(width / 2, height / 2 + 30, 520, 230, 0xf1dfbf, 0.98)
+      .setStrokeStyle(5, 0x6f553f, 1)
+      .setDepth(1501)
+      .setVisible(false);
+
+    this.endStats = this.add
+      .text(width / 2, height / 2 + 30, "", {
+        fontFamily: "Arial",
+        fontSize: "26px",
+        color: "#3e2d21",
+        align: "center",
+        lineSpacing: 12,
+      })
+      .setOrigin(0.5)
+      .setDepth(1502)
+      .setVisible(false);
+  }
+
+  createDebugHud() {
+    this.debugLayer = this.add.layer().setDepth(1600);
+
+    this.scoreText = this.add.text(16, 16, "", {
+      fontFamily: "Arial",
+      fontSize: "18px",
+      color: "#111827",
+      backgroundColor: "#ffffffdd",
+      padding: { left: 10, right: 10, top: 6, bottom: 6 },
+    });
+
+    this.stateText = this.add.text(16, 92, "", {
+      fontFamily: "Arial",
+      fontSize: "16px",
+      color: "#111827",
+      backgroundColor: "#ffffffcc",
+      padding: { left: 10, right: 10, top: 6, bottom: 6 },
+    });
+
+    this.debugLayer.add([this.scoreText, this.stateText]);
+    this.refreshDebugVisibility();
+  }
+
+  refreshDebugVisibility() {
+    this.debugLayer.setVisible(this.debugMode);
+    this.collisionGraphics.setVisible(this.debugMode);
+    this.zoneGraphics.setVisible(this.debugMode);
+
+    if (this.zoneLabels) {
+      this.zoneLabels.forEach((label) => label.setVisible(this.debugMode));
+    }
+  }
+
+  createClawMark(x, y) {
+    const container = this.add.container(x, y);
+
+    const slots = [];
+    for (let i = 0; i < 4; i++) {
+      const bg = this.add
+        .ellipse(i * 8, 0, 10, 34, 0x5d4637, 0.28)
+        .setAngle(-18);
+      const fill = this.add
+        .ellipse(i * 8, 10, 10, 0, 0xd86b5f, 1)
+        .setAngle(-18);
+      fill.setOrigin(0.5, 1);
+
+      container.add(bg);
+      container.add(fill);
+
+      slots.push({ bg, fill });
+    }
+
+    return { container, slots };
+  }
+
+  createNeedWidget(x, y, label, emoji, accentColor) {
+    const container = this.add.container(x, y);
+
+    // Основная карточка (шире и ниже по высоте)
+    const bgShadow = this.add
+      .rectangle(4, 4, 228, 48, 0x000000, 0.18)
+      .setOrigin(0.5);
+
+    const bg = this.add
+      .rectangle(0, 0, 224, 44, 0xf9f0d9, 1)
+      .setOrigin(0.5)
+      .setStrokeStyle(4, 0x6b4a35, 1);
+
+    // Иконка
+    const icon = this.add
+      .text(-92, 0, emoji, {
+        fontFamily: "Arial",
+        fontSize: "32px",
+      })
+      .setOrigin(0.5);
+
+    // Название (в одну строку)
+    const title = this.add
+      .text(-64, -10, label, {
+        fontFamily: "Arial",
+        fontSize: "17px",
+        fontStyle: "bold",
+        color: "#3f2a1f",
+      })
+      .setOrigin(0, 0.5);
+
+    const barBg = this.add
+      .rectangle(-64, 8, 148, 13, 0x5d4637, 0.25)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x6b4a35, 0.5);
+
+    const barFill = this.add
+      .rectangle(-64, 8, 0, 13, accentColor, 1)
+      .setOrigin(0, 0.5);
+
+    const barGloss = this.add
+      .rectangle(-64, 10, 0, 5, 0xffffff, 0.4)
+      .setOrigin(0, 0.5);
+
+    const infoText = this.add
+      .text(68, -10, "", {
+        fontFamily: "Arial",
+        fontSize: "15px",
+        fontStyle: "bold",
+        color: "#5d4637",
+      })
+      .setOrigin(0.5);
+
+    container.add([
+      bgShadow,
+      bg,
+      icon,
+      title,
+      barBg,
+      barFill,
+      barGloss,
+      infoText,
+    ]);
+
+    return {
+      container,
+      barFill,
+      barGloss,
+      infoText,
+      accentColor,
+    };
+  }
+
   updatePoopPrompt() {
     if (this.poopPromptStarted) return;
     if (this.roundState !== "playing") return;
@@ -782,7 +1067,29 @@ export class MainScene extends Phaser.Scene {
 
     this.poopPromptStarted = true;
     this.catState.schedulePoop(this.time.now, 0, 15000);
-    this.lastStatusMessage = "Кот захотел какать! Есть 15 секунд.";
+    this.setStatusMessage("Кот захотел какать! Есть 15 секунд.", true);
+  }
+
+  setStatusMessage(text, punch = false) {
+    this.lastStatusMessage = text;
+    this.statusText.setText(text);
+
+    if (punch) {
+      this.tweens.killTweensOf([
+        this.statusBubble,
+        this.statusBubbleShadow,
+        this.statusText,
+      ]);
+
+      this.tweens.add({
+        targets: [this.statusBubble, this.statusBubbleShadow, this.statusText],
+        scaleX: 1.04,
+        scaleY: 1.04,
+        duration: 90,
+        yoyo: true,
+        ease: "Quad.easeOut",
+      });
+    }
   }
 
   refreshHideState() {
@@ -826,7 +1133,7 @@ export class MainScene extends Phaser.Scene {
         label,
       });
 
-      this.lastStatusMessage = `Кота вырвало: ${label}`;
+      this.setStatusMessage(`Кота вырвало: ${label}`, true);
     }
 
     if (this.catState.shouldAutoPee(this.time.now)) {
@@ -841,7 +1148,7 @@ export class MainScene extends Phaser.Scene {
         label: "Лужа на полу",
       });
 
-      this.lastStatusMessage = "Кот не выдержал и написал на пол.";
+      this.setStatusMessage("Кот не выдержал и написал на пол.", true);
     }
 
     if (this.catState.shouldAutoPoop(this.time.now)) {
@@ -858,7 +1165,7 @@ export class MainScene extends Phaser.Scene {
           radius: 26,
         });
 
-        this.lastStatusMessage = "Кот не выдержал и нагадил на пол.";
+        this.setStatusMessage("Кот не выдержал и нагадил на пол.", true);
       }
     }
   }
@@ -880,20 +1187,9 @@ export class MainScene extends Phaser.Scene {
       if (!this.rectVsRect(vacuumRect, poopRect)) continue;
 
       this.evidenceSystem.remove(poop.id);
-
-      this.evidenceSystem.spawn({
-        type: "poop_smeared",
-        zoneId: "vacuum_trail",
-        x: this.vacuum.x,
-        y: this.vacuum.y,
-        points: this.catState.getSmearedPoopPoints(),
-        label: "Размазанная какашка",
-        radius: 72,
-        expiresAt: this.time.now + 15000,
-      });
-
-      this.lastStatusMessage = "Пылесос размазал какашку!";
-      break;
+      this.vacuum.activateDirtyTrail();
+      this.setStatusMessage("Пылесос наехал на какашку!", true);
+      return;
     }
   }
 
@@ -913,18 +1209,14 @@ export class MainScene extends Phaser.Scene {
       this.startActionByIndex(0);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action1)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action1))
       this.startActionByIndex(0);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action2)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action2))
       this.startActionByIndex(1);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action3)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action3))
       this.startActionByIndex(2);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action4)) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action4))
       this.startActionByIndex(3);
-    }
   }
 
   startActionByIndex(index) {
@@ -940,7 +1232,7 @@ export class MainScene extends Phaser.Scene {
       endsAt: this.time.now + action.durationMs,
     };
 
-    this.lastStatusMessage = `Делает: ${action.label}`;
+    this.setStatusMessage(`Делает: ${action.label}`);
   }
 
   updateActionProgress() {
@@ -948,7 +1240,7 @@ export class MainScene extends Phaser.Scene {
 
     if (!this.actionInProgress) return;
 
-    const { zone, action, startedAt, endsAt } = this.actionInProgress;
+    const { zone, startedAt, endsAt } = this.actionInProgress;
 
     const progress = Phaser.Math.Clamp(
       (this.time.now - startedAt) / (endsAt - startedAt),
@@ -959,14 +1251,20 @@ export class MainScene extends Phaser.Scene {
     const anchorX = zone ? zone.x : this.cat.x;
     const anchorY = zone ? zone.y : this.cat.y;
 
-    const x = Math.min(anchorX + 40, this.scale.width - 260);
-    const y = Math.max(anchorY - 54, 46);
+    const x = Math.min(anchorX + 38, this.scale.width - 220);
+    const y = Math.max(anchorY - 48, 54);
 
-    this.progressGraphics.fillStyle(0x0f172a, 0.9);
-    this.progressGraphics.fillRoundedRect(x, y, 220, 18, 8);
+    this.progressGraphics.fillStyle(0x4d3a2d, 0.24);
+    this.progressGraphics.fillRoundedRect(x + 4, y + 6, 180, 18, 8);
 
-    this.progressGraphics.fillStyle(0x22c55e, 1);
-    this.progressGraphics.fillRoundedRect(x, y, 220 * progress, 18, 8);
+    this.progressGraphics.fillStyle(0xf1dfbf, 0.98);
+    this.progressGraphics.fillRoundedRect(x, y, 180, 18, 8);
+
+    this.progressGraphics.fillStyle(0x74c476, 1);
+    this.progressGraphics.fillRoundedRect(x, y, 180 * progress, 18, 8);
+
+    this.progressGraphics.lineStyle(3, 0x6f553f, 1);
+    this.progressGraphics.strokeRoundedRect(x, y, 180, 18, 8);
 
     if (this.time.now >= endsAt) {
       this.completeAction();
@@ -992,9 +1290,9 @@ export class MainScene extends Phaser.Scene {
           radius: 26,
         });
 
-        this.lastStatusMessage = "Кот нагадил на пол.";
+        this.setStatusMessage("Кот нагадил на пол.", true);
       } else {
-        this.lastStatusMessage = "Уже поздно какать.";
+        this.setStatusMessage("Уже поздно какать.");
       }
 
       this.actionInProgress = null;
@@ -1003,7 +1301,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     if (!zone) {
-      this.lastStatusMessage = "Нет подходящей зоны для действия.";
+      this.setStatusMessage("Нет подходящей зоны для действия.");
       this.actionInProgress = null;
       this.catState.setBusy(false);
       return;
@@ -1026,13 +1324,18 @@ export class MainScene extends Phaser.Scene {
           label: evidenceMeta.label,
         });
 
-        this.lastStatusMessage = result.message;
+        this.setStatusMessage(result.message, true);
       } else {
         this.score += result.points;
-        this.lastStatusMessage = `${result.message} (+${result.points})`;
+        this.setStatusMessage(
+          result.points > 0
+            ? `${result.message} (+${result.points})`
+            : result.message,
+          result.points > 0,
+        );
       }
     } else {
-      this.lastStatusMessage = result.message || "Не получилось";
+      this.setStatusMessage(result.message || "Не получилось");
     }
 
     this.actionInProgress = null;
@@ -1090,6 +1393,7 @@ export class MainScene extends Phaser.Scene {
   showEndScreen(isWin, loseReason = "") {
     this.endOverlay.setVisible(true);
     this.endTitle.setVisible(true);
+    this.endStatsBg.setVisible(true);
     this.endStats.setVisible(true);
 
     this.endTitle.setText(isWin ? "ПОБЕДА" : "ПОРАЖЕНИЕ");
@@ -1113,13 +1417,6 @@ export class MainScene extends Phaser.Scene {
     if (this.catCaughtUntil > this.time.now) return;
     if (this.roundState !== "playing") return;
 
-    if (!this.catHomeSpawn) {
-      this.catHomeSpawn = {
-        x: this.mapBounds.x + 260,
-        y: this.mapBounds.y + 360,
-      };
-    }
-
     this.catCaughtUntil = this.time.now + 1400;
     this.catCaughtCount += 1;
     this.catState.setBusy(true);
@@ -1132,7 +1429,10 @@ export class MainScene extends Phaser.Scene {
     this.cat.x = this.catHomeSpawn.x;
     this.cat.y = this.catHomeSpawn.y;
 
-    this.lastStatusMessage = `Хозяин поймал кота! (${this.catCaughtCount}/${this.maxCatCaught})`;
+    this.setStatusMessage(
+      `Хозяин поймал кота! (${this.catCaughtCount}/${this.maxCatCaught})`,
+      true,
+    );
   }
 
   onCatMeow(x, y, now) {
@@ -1140,29 +1440,77 @@ export class MainScene extends Phaser.Scene {
   }
 
   updateHud() {
-    this.scoreText.setText(
-      `Очки: ${this.score}\nВыбешивание: ${this.rageMeter.current}/${this.rageMeter.max}`,
-    );
+    this.updatePlayerHud();
+    if (this.debugMode) {
+      this.updateDebugHud();
+    }
+  }
+
+  updatePlayerHud() {
+    const now = this.time.now;
+
+    const rageProgress = this.rageMeter.getProgress();
+    this.updateRageBar(rageProgress);
+
+    const timeLeftMs = Math.max(0, this.roundEndsAt - now);
+    const timeLeftSec = Math.ceil(timeLeftMs / 1000);
+    this.timerText.setText(`${timeLeftSec}с`);
+
+    if (timeLeftSec <= 10 && this.roundState === "playing") {
+      if (!this.timerPulseTween || !this.timerPulseTween.isPlaying()) {
+        this.timerPulseTween = this.tweens.add({
+          targets: [this.timerPanel, this.timerText],
+          scaleX: 1.08,
+          scaleY: 1.08,
+          duration: 120,
+          yoyo: true,
+          repeat: 1,
+          ease: "Quad.easeOut",
+        });
+      }
+    }
+
+    this.updateHearts();
+
+    const vomitState = this.getVomitUiState(now);
+    const peeState = this.getPeeUiState(now);
+    const poopState = this.getPoopUiState(now);
+    const waterState = this.getWaterUiState();
+
+    this.updateNeedWidget(this.needWidgets.vomit, vomitState);
+    this.updateNeedWidget(this.needWidgets.pee, peeState);
+    this.updateNeedWidget(this.needWidgets.poop, poopState);
+    this.updateNeedWidget(this.needWidgets.water, waterState);
+
+    this.updateActionMenu();
+  }
+
+  updateDebugHud() {
+    const now = this.time.now;
 
     const vomitText = this.catState.vomitPending
-      ? `авто-рвота через ${(this.catState.getVomitTimeLeft(this.time.now) / 1000).toFixed(1)}с`
+      ? `авто-рвота через ${(this.catState.getVomitTimeLeft(now) / 1000).toFixed(1)}с`
       : "нет рвоты";
 
     let peeText = "не хочет писать";
     if (this.catState.peePending && !this.catState.canPee) {
-      peeText = `попис через ${(this.catState.getPeeUnlockTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+      peeText = `попис через ${(this.catState.getPeeUnlockTimeLeft(now) / 1000).toFixed(1)}с`;
     } else if (this.catState.peePending && this.catState.canPee) {
-      peeText = `может писать еще ${(this.catState.getPeeDeadlineTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+      peeText = `может писать еще ${(this.catState.getPeeDeadlineTimeLeft(now) / 1000).toFixed(1)}с`;
     }
 
     let poopText = "used";
     if (!this.poopPromptStarted) {
       poopText = "нет";
     } else if (this.catState.poopPending && !this.catState.canPoop) {
-      poopText = `через ${(this.catState.getPoopUnlockTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+      poopText = `через ${(this.catState.getPoopUnlockTimeLeft(now) / 1000).toFixed(1)}с`;
     } else if (this.catState.poopPending && this.catState.canPoop) {
-      poopText = `${(this.catState.getPoopDeadlineTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+      poopText = `${(this.catState.getPoopDeadlineTimeLeft(now) / 1000).toFixed(1)}с`;
     }
+
+    this.scoreText.setText(
+      `Очки: ${this.score}\nВыбешивание: ${this.rageMeter.current}/${this.rageMeter.max}`,
+    );
 
     this.stateText.setText(
       [
@@ -1180,51 +1528,196 @@ export class MainScene extends Phaser.Scene {
         `caught: ${this.catCaughtCount}/${this.maxCatCaught}`,
       ].join("\n"),
     );
+  }
 
-    this.statusText.setText(
-      this.lastStatusMessage || "WASD — ходить, M — мяукать",
-    );
+  updateRageBar(progress) {
+    const clamped = Phaser.Math.Clamp(progress, 0, 1);
+    const maxWidth = 340;
 
-    const rageProgress = this.rageMeter.getProgress();
-    this.rageBarFill.width = 420 * rageProgress;
+    this.rageBarFill.width = maxWidth * clamped;
+    this.rageBarGloss.width = maxWidth * clamped * 0.72;
 
-    const timeLeftMs = Math.max(0, this.roundEndsAt - this.time.now);
-    const timeLeftSec = Math.ceil(timeLeftMs / 1000);
-    this.roundTimerText.setText(`⏱ ${timeLeftSec}s`);
+    if (clamped >= 0.85 && this.roundState === "playing") {
+      if (!this.rageBarPulseTween || !this.rageBarPulseTween.isPlaying()) {
+        this.rageBarPulseTween = this.tweens.add({
+          targets: [this.rageBarBg, this.rageBarFill],
+          scaleY: 1.08,
+          duration: 180,
+          yoyo: true,
+          repeat: 1,
+          ease: "Sine.easeInOut",
+        });
+      }
+    }
+  }
 
-    this.updateActionMenu();
+  updateHearts() {
+    const remainingLives = Math.max(0, 3 - this.catCaughtCount);
+
+    this.hearts.forEach((heart, index) => {
+      if (index < remainingLives) {
+        heart.setText("❤️");
+        heart.setColor("#ff6b6b"); // яркий цвет когда живое
+        heart.setScale(1);
+      } else {
+        heart.setText("♡"); // пустое сердце (outline)
+        heart.setColor("#8c6f5a"); // приглушённый бежевый
+        heart.setScale(0.95);
+      }
+    });
+  }
+
+  getVomitUiState(now) {
+    if (!this.catState.vomitPending) {
+      return { progress: 0, text: "спокойно", active: false };
+    }
+
+    const left = this.catState.getVomitTimeLeft(now);
+    const total = 10000;
+    const progress = Phaser.Math.Clamp(1 - left / total, 0, 1);
+
+    return {
+      progress,
+      text: `${(left / 1000).toFixed(1)}с`,
+      active: true,
+    };
+  }
+
+  getPeeUiState(now) {
+    if (!this.catState.peePending) {
+      return { progress: 0, text: "нет", active: false };
+    }
+
+    if (!this.catState.canPee) {
+      const left = this.catState.getPeeUnlockTimeLeft(now);
+      const total = 20000;
+      const progress = Phaser.Math.Clamp(1 - left / total, 0, 1);
+
+      return {
+        progress,
+        text: `через ${(left / 1000).toFixed(1)}с`,
+        active: true,
+      };
+    }
+
+    const left = this.catState.getPeeDeadlineTimeLeft(now);
+    const total = 20000;
+    const progress = Phaser.Math.Clamp(left / total, 0, 1);
+
+    return {
+      progress,
+      text: `${(left / 1000).toFixed(1)}с`,
+      active: true,
+    };
+  }
+
+  getPoopUiState(now) {
+    if (!this.poopPromptStarted) {
+      return { progress: 0, text: "нет", active: false };
+    }
+
+    if (this.catState.hasPooped) {
+      return { progress: 1, text: "done", active: false };
+    }
+
+    if (this.catState.poopPending && !this.catState.canPoop) {
+      const left = this.catState.getPoopUnlockTimeLeft(now);
+      return {
+        progress: 0.15,
+        text: `через ${(left / 1000).toFixed(1)}с`,
+        active: true,
+      };
+    }
+
+    if (this.catState.poopPending && this.catState.canPoop) {
+      const left = this.catState.getPoopDeadlineTimeLeft(now);
+      const total = 15000;
+      const progress = Phaser.Math.Clamp(left / total, 0, 1);
+
+      return {
+        progress,
+        text: `${(left / 1000).toFixed(1)}с`,
+        active: true,
+      };
+    }
+
+    return { progress: 0, text: "used", active: false };
+  }
+
+  getWaterUiState() {
+    if (!this.catState.hasWaterInMouth) {
+      return { progress: 0, text: "пусто", active: false };
+    }
+
+    return { progress: 1, text: "во рту", active: true };
+  }
+
+  updateNeedWidget(widget, state) {
+    const maxBarWidth = 148;
+
+    widget.barFill.width =
+      maxBarWidth * Phaser.Math.Clamp(state.progress, 0, 1);
+
+    widget.barGloss.width =
+      maxBarWidth * Phaser.Math.Clamp(state.progress * 0.72, 0, 1);
+
+    widget.infoText.setText(state.text);
+
+    widget.container.alpha = state.active ? 1.0 : 0.72;
+
+    if (state.active && state.progress > 0.82) {
+      if (!widget.pulseTween || !widget.pulseTween.isPlaying()) {
+        widget.pulseTween = this.tweens.add({
+          targets: widget.icon,
+          scaleX: 1.25,
+          scaleY: 1.25,
+          duration: 260,
+          yoyo: true,
+          repeat: 1,
+          ease: "Sine.easeInOut",
+        });
+      }
+    } else if (widget.pulseTween && widget.pulseTween.isPlaying()) {
+      widget.pulseTween.stop();
+      widget.icon.setScale(1);
+    }
   }
 
   updateActionMenu() {
     if (this.currentActions.length === 0) {
-      this.menuBg.setVisible(false);
-      this.menuText.setVisible(false);
+      this.actionMenuBg.setVisible(false);
+      this.actionMenuShadow.setVisible(false);
+      this.actionMenuText.setVisible(false);
       return;
     }
 
     const anchorX = this.currentZone ? this.currentZone.x : this.cat.x;
     const anchorY = this.currentZone ? this.currentZone.y : this.cat.y;
 
-    const lines = this.currentActions.length
-      ? this.currentActions.map(
-          (action, i) =>
-            `[${i + 1}] ${action.label} (${(action.durationMs / 1000).toFixed(1)}с)`,
-        )
-      : ["Нет доступных действий"];
+    const lines = this.currentActions.map(
+      (action, i) =>
+        `[${i + 1}] ${action.label}  ${(action.durationMs / 1000).toFixed(1)}с`,
+    );
 
     const title = this.currentZone ? this.currentZone.label : "Кот";
     const text = `${title}\n\n${lines.join("\n")}`;
 
-    const menuX = Math.min(anchorX + 50, this.scale.width - 340);
-    const menuY = Math.max(anchorY - 30, 70);
+    const menuX = Math.min(anchorX + 54, this.scale.width - 360);
+    const menuY = Math.max(anchorY - 30, 90);
 
-    this.menuBg.setPosition(menuX, menuY);
-    this.menuBg.setSize(320, 64 + lines.length * 28);
-    this.menuBg.setVisible(true);
+    const menuHeight = 68 + lines.length * 28;
 
-    this.menuText.setPosition(menuX + 12, menuY + 10);
-    this.menuText.setText(text);
-    this.menuText.setVisible(true);
+    this.actionMenuShadow.setPosition(menuX + 4, menuY + 6);
+    this.actionMenuShadow.setSize(340, menuHeight);
+    this.actionMenuShadow.setVisible(true);
+
+    this.actionMenuBg.setPosition(menuX, menuY);
+    this.actionMenuBg.setSize(340, menuHeight);
+    this.actionMenuBg.setVisible(true);
+
+    this.actionMenuText.setPosition(menuX + 14, menuY + 12);
+    this.actionMenuText.setText(text);
+    this.actionMenuText.setVisible(true);
   }
 
   redrawColliders() {
@@ -1245,6 +1738,8 @@ export class MainScene extends Phaser.Scene {
         this.collisionGraphics.strokeCircle(c.x, c.y, c.radius);
       }
     }
+
+    this.collisionGraphics.setVisible(this.debugMode);
   }
 
   redrawZones() {
@@ -1269,6 +1764,8 @@ export class MainScene extends Phaser.Scene {
         );
       }
     }
+
+    this.zoneGraphics.setVisible(this.debugMode);
   }
 
   createZoneLabels() {
@@ -1284,6 +1781,8 @@ export class MainScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(150);
     });
+
+    this.zoneLabels.forEach((label) => label.setVisible(this.debugMode));
   }
 
   willCollideWithStatic(nextX, nextY, width, height) {
