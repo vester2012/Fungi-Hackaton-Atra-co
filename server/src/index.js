@@ -252,6 +252,18 @@ io.on('connection', (socket) => {
       io.to(player.roomId).emit('playerAttacked', { attackerId: socket.id, ...data });
     }
   });
+  socket.on('playerAction', (data) => {
+    const player = activePlayers[socket.id];
+    if (player && player.roomId) {
+      // Рассылаем всем в комнате, кроме самого отправителя
+      socket.to(player.roomId).emit('playerActionReceive', {
+        playerId: socket.id,
+        action: data.action,
+        dirX: data.dirX,
+        dirY: data.dirY
+      });
+    }
+  });
 
   socket.on('playerHit', (data) => {
     const player = activePlayers[socket.id];

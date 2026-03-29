@@ -277,11 +277,9 @@ export class MainScene extends Phaser.Scene {
       if (id !== unit_manager.my_id) {
         if (!data.obj) {
           data.obj = this.createEnemy();
-          // При создании сразу задаем ник и цвет
           if (data.username) data.obj.healthIndicator.setNickname(data.username);
         }
 
-        // Синхронизируем цвет, если он изменился или еще не применен
         if (data.tint !== undefined && data.obj.currentTint !== data.tint) {
           data.obj.setSlotColor('body', data.tint);
         }
@@ -289,10 +287,16 @@ export class MainScene extends Phaser.Scene {
         data.obj.applyRemoteState(data.x, data.y, time);
         if (typeof data.hp === 'number') data.obj.setHp(data.hp);
 
-        // Обработка атаки
+        // Обработка удаленной атаки
         if (data.pendingAttackId && data.pendingAttackId !== data.lastPlayedAttackId) {
           data.lastPlayedAttackId = data.pendingAttackId;
           data.obj.playRemoteAttack(time);
+        }
+
+        // Обработка удаленного дэша
+        if (data.pendingAction === 'dash') {
+          data.obj.playRemoteDash(data.actionDirX, data.actionDirY);
+          data.pendingAction = null;
         }
       }
     }

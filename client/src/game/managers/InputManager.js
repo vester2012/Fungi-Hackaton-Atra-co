@@ -55,6 +55,7 @@ export class InputManager {
             left: this.keys.left.isDown || this.virtualInput.left || padLeft,
             right: this.keys.right.isDown || this.virtualInput.right || padRight,
             down: this.keys.down.isDown || this.virtualInput.down || padDown,
+            up: this.keys.up.isDown || this.virtualInput.up, // добавили up
 
             jump: this.keys.up.isDown || this.keys.space.isDown || this.virtualInput.jump || this.virtualInput.up || padJump,
 
@@ -65,8 +66,12 @@ export class InputManager {
     get left() { return this.currentState.left; }
     get right() { return this.currentState.right; }
     get down() { return this.currentState.down; }
+    get up() { return this.currentState.up; }
 
     get jumpJustPressed() { return this.currentState.jump && !this.prevState.jump; }
     get attackJustPressed() { return this.currentState.attack && !this.prevState.attack; }
     get downJustPressed() { return this.currentState.down && !this.prevState.down; }
+    get leftJustPressed() { return this.currentState.left && !this.prevState.left; }
+    get rightJustPressed() { return this.currentState.right && !this.prevState.right; }
+    get upJustPressed() { return this.currentState.up && !this.prevState.up; }
 }

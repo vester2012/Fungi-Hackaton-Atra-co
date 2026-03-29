@@ -23,7 +23,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitbox.body.setCollideWorldBounds(true);
     this.hitbox.body.setBounce(0, 0);
     this.hitbox.body.setDragX(1600);
-    this.hitbox.body.setMaxVelocity(600, 1200); // Немного увеличил макс. скорость для сочности прыжка
+    this.hitbox.body.setMaxVelocity(600, 1200);
     this.hitbox.body.setSize(this.hitbox.width, this.hitbox.height);
     this.hitbox.body.setOffset(0, 0);
 
@@ -33,10 +33,27 @@ export class Character extends Phaser.GameObjects.Container {
     this.maxJumps = 2;
     this.jumpCount = 0;
 
+    // --- ПАРАМЕТРЫ ДЭША (DASH) ---
+    this.dashSpeed = 1600;         // Скорость рывка
+    this.dashDurationMs = 150;     // Длительность рывка
+    this.dashCooldownMs = 1500;    // Перезарядка
+    this.dashWindowMs = 150;       // Окно двойного клика
+
+    this.dashState = {
+      isDashing: false,
+      until: 0,
+      cooldownUntil: 0,
+      dirX: 0,
+      dirY: 0
+    };
+
+    // Время последнего нажатия для отслеживания двойного клика
+    this.lastTaps = { left: 0, right: 0, up: 0, down: 0 };
+
     // --- ПАРАМЕТРЫ СКОЛЬЖЕНИЯ ПО СТЕНЕ (WALL SLIDE) ---
-    this.wallSlideMaxSpeed = 160; // Скорость падения по стене
-    this.wallJumpForceX = 550;   // Сила отскока от стены по горизонтали
-    this.wallJumpForceY = 750;   // Сила отскока от стены по вертикали
+    this.wallSlideMaxSpeed = 160;
+    this.wallJumpForceX = 550;
+    this.wallJumpForceY = 750;
     this.wallSlideState = {
       isActive: false,
       direction: 0,
@@ -65,9 +82,8 @@ export class Character extends Phaser.GameObjects.Container {
     this.showStats = options.showStats ?? true;
     this.nickname = options.nickname ?? 'Player';
     this.currentAnimation = 'idle';
-    this.lastDownTapAt = 0;
+
     this.dropThroughUntil = 0;
-    this.downTapWindowMs = 250;
     this.dropThroughDurationMs = 220;
 
     // Анимации Spine
@@ -89,84 +105,118 @@ export class Character extends Phaser.GameObjects.Container {
     this.events = new Phaser.Events.EventEmitter();
   }
 
-  // Обновляем сигнатуру метода
   update(time = this.scene.time.now, delta = this.scene.game.loop.delta) {
     this.controller.update();
-    const now = time; // Используем время из аргумента
-    const dt = delta / 1000; // Дельта в секундах для расчетов
+    const now = time;
+    const dt = delta / 1000;
 
     const leftPressed = this.controller.left;
     const rightPressed = this.controller.right;
     const jumpPressed = this.controller.jumpJustPressed;
     const attackPressed = this.controller.attackJustPressed;
-    const downPressed = this.controller.downJustPressed;
+
+    const leftJustPressed = this.controller.leftJustPressed ?? (leftPressed && !this.controller.prevState?.left);
+    const rightJustPressed = this.controller.rightJustPressed ?? (rightPressed && !this.controller.prevState?.right);
+    const downJustPressed = this.controller.downJustPressed ?? (this.controller.down && !this.controller.prevState?.down);
+
+    // ИСПРАВЛЕНИЕ ОШИБКИ WEBPACK: скобки вокруг оператора ?? перед ||
+    const upJustPressed = (this.controller.upJustPressed ?? (this.controller.currentState?.up && !this.controller.prevState?.up)) || jumpPressed;
 
     const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
     const movingHorizontally = leftPressed !== rightPressed;
 
-    if (now - this.wallSlideState.lastActiveTime > 100) {
-      this.wallSlideState.isActive = false;
+    // === 1. ЗАВЕРШЕНИЕ ДЭША ===
+    if (now > this.dashState.until && this.dashState.isDashing) {
+      this.dashState.isDashing = false;
+      this.hitbox.body.setAllowGravity(true);
+      this.hitbox.body.setMaxVelocity(600, 1200);
+      this.anim.timeScale = 1.0;
     }
 
-    if (isGrounded) {
-      this.jumpCount = 0;
-      this.wallSlideState.isActive = false;
+    // === 2. ИНИЦИАЦИЯ ДЭША (Двойной клик) ===
+    if (!this.dashState.isDashing && now > this.dashState.cooldownUntil) {
+      let dX = 0, dY = 0;
+
+      if (leftJustPressed)   { if (now - this.lastTaps.left <= this.dashWindowMs) dX = -1; this.lastTaps.left = now; }
+      if (rightJustPressed)  { if (now - this.lastTaps.right <= this.dashWindowMs) dX = 1;  this.lastTaps.right = now; }
+      if (upJustPressed)     { if (now - this.lastTaps.up <= this.dashWindowMs) dY = -1;   this.lastTaps.up = now; }
+      if (downJustPressed)   { if (now - this.lastTaps.down <= this.dashWindowMs) dY = 1;   this.lastTaps.down = now; }
+
+      if (dX !== 0 || dY !== 0) {
+        this.startDash(dX, dY, now);
+      }
     }
 
-    if (jumpPressed) {
-      if (this.wallSlideState.isActive && !isGrounded) {
-        const jumpDir = -this.wallSlideState.direction;
-        this.hitbox.body.setVelocity(jumpDir * this.wallJumpForceX, -this.wallJumpForceY);
-        this.applyFacingDirection(jumpDir);
-        this.jumpCount = 1;
+    // === 3. ДВИЖЕНИЕ ===
+    if (this.dashState.isDashing) {
+      this.hitbox.body.setVelocity(this.dashState.dirX * this.dashSpeed, this.dashState.dirY * this.dashSpeed);
+      this.createDashTrail();
+    } else {
+      if (now - this.wallSlideState.lastActiveTime > 100) {
         this.wallSlideState.isActive = false;
-        this.playJumpSound();
-      } else if (this.jumpCount < this.maxJumps) {
-        this.hitbox.body.setVelocityY(-this.jumpSpeed);
-        this.jumpCount += 1;
-        this.playJumpSound();
       }
-    }
 
-    if (this.wallSlideState.isActive && !isGrounded) {
-      if (this.hitbox.body.velocity.y > this.wallSlideMaxSpeed) {
-        this.hitbox.body.setVelocityY(this.wallSlideMaxSpeed);
+      if (isGrounded) {
+        this.jumpCount = 0;
+        this.wallSlideState.isActive = false;
       }
-    }
 
-    const isWallJumping = !isGrounded && Math.abs(this.hitbox.body.velocity.x) > this.moveSpeed;
-
-    if (!isWallJumping) {
-      if (leftPressed && !rightPressed) {
-        this.hitbox.body.setVelocityX(-this.moveSpeed);
-        this.applyFacingDirection(-1);
-      } else if (rightPressed && !leftPressed) {
-        this.hitbox.body.setVelocityX(this.moveSpeed);
-        this.applyFacingDirection(1);
-      } else {
-        this.hitbox.body.setVelocityX(0);
+      if (jumpPressed) {
+        if (this.wallSlideState.isActive && !isGrounded) {
+          const jumpDir = -this.wallSlideState.direction;
+          this.hitbox.body.setVelocity(jumpDir * this.wallJumpForceX, -this.wallJumpForceY);
+          this.applyFacingDirection(jumpDir);
+          this.jumpCount = 1;
+          this.wallSlideState.isActive = false;
+          this.playJumpSound();
+        } else if (this.jumpCount < this.maxJumps) {
+          this.hitbox.body.setVelocityY(-this.jumpSpeed);
+          this.jumpCount += 1;
+          this.playJumpSound();
+        }
       }
-    }
 
-    if (downPressed) {
-      if (now - this.lastDownTapAt <= 350 && isGrounded && this.isStandingOnDropThroughPlatform()) {
+      if (this.wallSlideState.isActive && !isGrounded) {
+        if (this.hitbox.body.velocity.y > this.wallSlideMaxSpeed) {
+          this.hitbox.body.setVelocityY(this.wallSlideMaxSpeed);
+        }
+      }
+
+      const isWallJumping = !isGrounded && Math.abs(this.hitbox.body.velocity.x) > this.moveSpeed;
+
+      if (!isWallJumping) {
+        if (leftPressed && !rightPressed) {
+          this.hitbox.body.setVelocityX(-this.moveSpeed);
+          this.applyFacingDirection(-1);
+        } else if (rightPressed && !leftPressed) {
+          this.hitbox.body.setVelocityX(this.moveSpeed);
+          this.applyFacingDirection(1);
+        } else {
+          this.hitbox.body.setVelocityX(0);
+        }
+      }
+
+      // СПРЫГИВАНИЕ ВНИЗ: Одинарное нажатие
+      if (downJustPressed && isGrounded && this.isStandingOnDropThroughPlatform()) {
         this.dropThroughUntil = now + this.dropThroughDurationMs;
-        // Delta time fix: вместо жесткого +5, сдвигаем на величину, зависящую от скорости падения
         this.hitbox.y += 300 * dt;
         this.hitbox.body.setVelocityY(200);
       }
-      this.lastDownTapAt = now;
     }
 
-    if (attackPressed) {
+    // === 4. АТАКА ===
+    if (attackPressed && !this.dashState.isDashing) {
       if (this.tryAttack(now)) {
         this.playKickSound();
         this.playAttackAnimation(movingHorizontally && isGrounded);
       }
     }
 
+    // === 5. АНИМАЦИИ ===
     if (!this.isAttacking() && !this.isHit()) {
-      if (!isGrounded) {
+      if (this.dashState.isDashing) {
+        this.setAnimation(this.dashState.dirY !== 0 ? 'fly' : 'run', true);
+      } else if (!isGrounded) {
         this.setAnimation(this.hitbox.body.velocity.y < 0 ? 'jump' : 'fly');
       } else if (this.wallSlideState.isActive) {
         this.setAnimation('fly');
@@ -174,13 +224,77 @@ export class Character extends Phaser.GameObjects.Container {
         this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
       }
     }
+
     if (this.currentTint !== undefined) {
       this.applySlotColor('body', this.currentTint);
     }
+
+    if (this.showStats && this.healthIndicator && this.healthIndicator.updateDash) {
+      let dashRatio = 1;
+      if (now < this.dashState.cooldownUntil) {
+        dashRatio = 1 - ((this.dashState.cooldownUntil - now) / this.dashCooldownMs);
+      }
+      this.healthIndicator.updateDash(dashRatio);
+    }
+
     this.syncContainerToHitbox();
   }
 
-  // МЕТОД ДЛЯ ЗОН (ВЫЗЫВАЕТСЯ ИЗ WallSlideZone)
+  // --- МЕТОДЫ ДЭША ---
+  startDash(dirX, dirY, now = this.scene.time.now) {
+    this.dashState.isDashing = true;
+
+    // Нормализация диагоналей
+    let length = Math.sqrt(dirX * dirX + dirY * dirY);
+    this.dashState.dirX = dirX / length;
+    this.dashState.dirY = dirY / length;
+
+    this.dashState.until = now + this.dashDurationMs;
+    this.dashState.cooldownUntil = now + this.dashCooldownMs;
+
+    this.hitbox.body.setAllowGravity(false);
+    this.hitbox.body.setMaxVelocity(this.dashSpeed, this.dashSpeed);
+
+    if (dirX !== 0) this.applyFacingDirection(dirX);
+
+    this.anim.timeScale = 2.5;
+    this.playJumpSound();
+
+    if (unit_manager.socket) {
+      unit_manager.socket.emit('playerAction', { action: 'dash', dirX, dirY });
+    }
+  }
+
+  createDashTrail() {
+    if (this.scene.time.now % 2 !== 0) return;
+
+    const trail = this.scene.add.rectangle(
+        this.hitbox.x,
+        this.hitbox.y,
+        this.hitbox.width,
+        this.hitbox.height,
+        0x0ea5e9,
+        0.5
+    );
+    trail.setOrigin(0.5);
+    trail.setDepth(this.depth - 1);
+
+    this.scene.tweens.add({
+      targets: trail,
+      alpha: 0,
+      scaleX: 0.2,
+      scaleY: 0.2,
+      duration: 300,
+      ease: 'Sine.out',
+      onComplete: () => trail.destroy()
+    });
+  }
+
+  playRemoteDash(dirX, dirY) {
+    this.startDash(dirX, dirY, this.scene.time.now);
+  }
+
+  // --- ОСТАЛЬНЫЕ МЕТОДЫ ИГРОКА ---
   setWallSliding(direction) {
     this.wallSlideState.isActive = true;
     this.wallSlideState.direction = direction;
@@ -199,18 +313,11 @@ export class Character extends Phaser.GameObjects.Container {
     const body = this.hitbox.body;
     return this.scene.platforms.getChildren().some((platform) => {
       if (!platform.isDropThrough) return false;
-
-      // 1. Проверяем, что низ игрока совпадает с верхом платформы (с допуском 5 пикселей)
       const isOnTop = Math.abs(body.bottom - platform.body.top) <= 5;
-
-      // 2. Проверяем, что игрок находится внутри ширины платформы
       const isWithinX = body.right > platform.body.left && body.left < platform.body.right;
-
       return isOnTop && isWithinX;
     });
   }
-
-
 
   syncContainerToHitbox() {
     this.isSyncingFromHitbox = true;
@@ -289,33 +396,21 @@ export class Character extends Phaser.GameObjects.Container {
 
   playJumpSound() {
     const jumpSoundKeys = ['jump', 'jump1', 'jump2'];
-
-    if (this.scene.sound.locked) {
-      return;
-    }
-
+    if (this.scene.sound.locked) return;
     const key = Phaser.Utils.Array.GetRandom(jumpSoundKeys);
     this.scene.sound.play(key, { volume: 0.1 });
   }
 
   playKickSound() {
     const kickSoundKeys = ['kick', 'kick1'];
-
-    if (this.scene.sound.locked) {
-      return;
-    }
-
+    if (this.scene.sound.locked) return;
     const key = Phaser.Utils.Array.GetRandom(kickSoundKeys);
     this.scene.sound.play(key, { volume: 0.2 });
   }
 
   playDamageSound() {
     const damageSoundKeys = ['damage', 'damage1', 'damage2', 'damage3'];
-
-    if (this.scene.sound.locked) {
-      return;
-    }
-
+    if (this.scene.sound.locked) return;
     const key = Phaser.Utils.Array.GetRandom(damageSoundKeys);
     this.scene.sound.play(key, { volume: 0.2 });
   }
@@ -326,7 +421,9 @@ export class Character extends Phaser.GameObjects.Container {
     const isMoving = Math.abs(movedX) > 1;
     this.setPosition(x, y);
     if (movedX !== 0) this.applyFacingDirection(movedX < 0 ? -1 : 1);
-    if (!this.isAttacking() && !this.isHit()) {
+
+    // Не меняем анимации, если игрок атакует, получает урон или делает дэш
+    if (!this.isAttacking() && !this.isHit() && !this.dashState.isDashing) {
       if (Math.abs(movedY) > 1) {
         this.setAnimation(movedY < 0 ? 'jump' : 'fly');
       } else {
@@ -336,33 +433,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.syncAttackHitbox();
   }
 
-  isAttacking() {
-    return this.scene.time.now < this.attackUntil;
-  }
-
-  isHit() {
-    return this.scene.time.now < this.hitUntil;
-  }
-
-  getAttackDamage() {
-    return this.baseDamage;
-  }
-
-  getAttackHitbox() {
-    return this.attackHitbox;
-  }
-
-  getAttackId() {
-    return this.attackId;
-  }
-
-  getHp() {
-    return this.hp;
-  }
-
-  getMaxHp() {
-    return this.maxHp;
-  }
+  isAttacking() { return this.scene.time.now < this.attackUntil; }
+  isHit() { return this.scene.time.now < this.hitUntil; }
+  getAttackDamage() { return this.baseDamage; }
+  getAttackHitbox() { return this.attackHitbox; }
+  getAttackId() { return this.attackId; }
+  getHp() { return this.hp; }
+  getMaxHp() { return this.maxHp; }
 
   setHp(nextHp) {
     this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
@@ -376,15 +453,12 @@ export class Character extends Phaser.GameObjects.Container {
     } else {
       this.hp = Math.max(0, this.hp - amount);
     }
-
     this.syncHpText();
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
 
-  isDead() {
-    return this.hp <= 0;
-  }
+  isDead() { return this.hp <= 0; }
 
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
@@ -396,30 +470,22 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   shouldCollideWithPlatform(platform) {
-    // Твердые платформы — всегда сталкиваемся
     if (!platform.isDropThrough) return true;
-
-    // Если активировано падение (спрыгивание вниз двойным кликом S / Вниз) — отключаем коллизию!
     if (this.isDroppingThroughPlatform()) return false;
-    
     return true;
   }
-
 
   setAnimation(name, loop) {
     if (this.currentAnimation === name) return;
     this.currentAnimation = name;
     this.anim.play(name, loop);
   }
-  /**
-   * Устанавливает цвет для конкретного слота Spine
-   * @param {string} slotName - Имя слота из Spine (например, 'body', 'hat', 'hand_l')
-   * @param {number} colorHex - Цвет в формате 0xRRGGBB
-   */
+
   setSlotColor(slotName, colorHex) {
-    this.currentTint = colorHex; // Запоминаем для update
+    this.currentTint = colorHex;
     this.applySlotColor(slotName, colorHex);
   }
+
   applySlotColor(slotName, colorHex) {
     if (!this.anim || !this.anim.skeleton) return;
     const slot = this.anim.skeleton.findSlot(slotName);
@@ -430,31 +496,19 @@ export class Character extends Phaser.GameObjects.Container {
       slot.color.b = phaserColor.blue / 255;
     }
   }
+
   destroy(fromScene) {
-    // 1. Снимаем все слушатели с собственного эмиттера
     if (this.events) {
       this.events.removeAllListeners();
-      this.events.destroy(); // В новых версиях Phaser лучше использовать destroy вместо shutdown
+      this.events.destroy();
     }
-
-    // 2. Явно уничтожаем Spine объект
     if (this.anim) {
       this.anim.destroy();
       this.anim = null;
     }
-
-    if (this.healthIndicator) {
-      this.healthIndicator.destroy();
-    }
-
-    if (this.attackHitbox) {
-      this.attackHitbox.destroy();
-    }
-
-    if (this.hitbox) {
-      // Удален ручной вызов disableBody, Phaser очистит его сам при destroy
-      this.hitbox.destroy();
-    }
+    if (this.healthIndicator) this.healthIndicator.destroy();
+    if (this.attackHitbox) this.attackHitbox.destroy();
+    if (this.hitbox) this.hitbox.destroy();
 
     super.destroy(fromScene);
   }
