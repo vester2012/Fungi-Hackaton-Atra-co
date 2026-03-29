@@ -20,6 +20,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.facingDirection = -1;
     this.lastHitByAttackId = 0;
     this.damageFlashTimer = null;
+    this.showStats = options.showStats ?? true;
 
     this.hitbox = scene.add.rectangle(x, y - 38, 76, 116, 0xef4444, 0.2).setStrokeStyle(2, 0xfca5a5, 0.95);
     scene.physics.add.existing(this.hitbox);
@@ -55,9 +56,6 @@ export class Enemy extends Phaser.GameObjects.Container {
 
     this.syncAttackZone(time);
     this.syncHpText();
-
-    // Плавная смена цвета через lerp или delta (опционально),
-    // но сейчас просто завяжем на системное время
     this.visual.setFillStyle(this.isAttacking(time) ? 0xf97316 : 0xb91c1c, this.isAttacking(time) ? 1 : 0.85);
 
     this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
@@ -67,7 +65,6 @@ export class Enemy extends Phaser.GameObjects.Container {
     }
   }
 
-  // ВОТ ЭТОТ МЕТОД БЫЛ УТЕРЯН
   syncHpText() {
     if (!this.active || !this.showStats || !this.healthIndicator) return;
     const textX = Math.round(this.hitbox.x);

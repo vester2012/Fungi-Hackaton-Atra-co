@@ -1,5 +1,6 @@
 import { Character } from '../entities/Character.js';
 import { Enemy } from '../entities/Enemy.js';
+import { SkeletonBombEnemy } from '../entities/SkeletonBombEnemy.js';
 import { Platform } from '../entities/Platform.js';
 import { EnemyManager } from '../managers/EnemyManager.js';
 import {unit_manager} from "../unit_manager";
@@ -444,9 +445,8 @@ export class MainScene extends Phaser.Scene {
 
   createEnemiesBot() {
     this.enemiesBot = this.enemySpawns.map((spawn) => {
-        const enemy = new Enemy(this, spawn.x, spawn.y, { id: spawn.id });
+        const enemy = new SkeletonBombEnemy(this, spawn.x, spawn.y, { id: spawn.id });
 
-        // ВАЖНО: Привязываем живой объект в unit_manager, чтобы main.js его видел
         if (!unit_manager.info.enemies[spawn.id]) {
             unit_manager.info.enemies[spawn.id] = {};
         }
@@ -491,11 +491,10 @@ export class MainScene extends Phaser.Scene {
 
     this.enemyManager?.handlePlayerAttack(playerAttackBounds, attackId, this.character.getAttackDamage());
 
-    // Фильтрация и очистка
     for (let i = this.enemiesBot.length - 1; i >= 0; i--) {
         if (this.enemiesBot[i].isDead() && (!this.enemiesBot[i].isReadyToDestroy || this.enemiesBot[i].isReadyToDestroy(time))) {
             const enemy = this.enemiesBot[i];
-            delete unit_manager.info.enemies[enemy.id]; // Очищаем ссылку в менеджере!
+            delete unit_manager.info.enemies[enemy.id];
             enemy.destroy();
             this.enemiesBot.splice(i, 1);
         }
