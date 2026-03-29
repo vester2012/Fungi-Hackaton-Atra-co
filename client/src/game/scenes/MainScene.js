@@ -468,7 +468,8 @@ export class MainScene extends Phaser.Scene {
     unit_manager.info.players = {};
     unit_manager.info.enemies = {};
 
-    this.scene.start('MenuScene');
+    window.location.reload()
+    //this.scene.start('MenuScene');
   }
 
   createEnemy() {

@@ -79,6 +79,7 @@ export class MenuScene extends Phaser.Scene {
       color: '#cbd5e1'
     }).setOrigin(0.5);
 
+
     this.createMenuButton(width * 0.5, 270 * 1.35, 360, 64, 'Start Game', 0x22c55e, () => {
       unit_manager.socket.emit("join_room", { sid: localStorage.getItem('game_session_id'), idRoom: 1, passRoom: ''});
       unit_manager.socket.once('joined_room_success', (data) => {
@@ -124,6 +125,13 @@ export class MenuScene extends Phaser.Scene {
         this.bgMusic.play();
       }
     });
+
+    unit_manager.socket.emit("join_room", { sid: localStorage.getItem('game_session_id'), idRoom: 1, passRoom: ''});
+    unit_manager.socket.once('joined_room_success', (data) => {
+      this.scene.start('MainScene');
+    });
+
+
   }
   changePlayerColor() {
     this.currentColorIndex = (this.currentColorIndex + 1) % this.colors.length;
