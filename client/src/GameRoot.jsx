@@ -209,7 +209,11 @@ export default function GameRoot() {
                 await document.fonts.load('16px "JungleAdventurer"');
             }
 
-            phaserGameRef.current = bootGame('game-root');
+            phaserGameRef.current = bootGame('game-root', {
+                onExitToMenu: () => {
+                    setIsGameStarted(false);
+                }
+            });
         }
 
         startGame();

@@ -12,8 +12,9 @@ const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
 
 export class MainScene extends Phaser.Scene {
-  constructor() {
+  constructor(ui = {}) {
     super('MainScene');
+    this.onExitToMenu = ui.onExitToMenu;
     console.log(unit_manager.info.players);
   }
 
@@ -95,10 +96,10 @@ export class MainScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0);
 
     backButton.on('pointerover', () => backButton.setFillStyle(0xfbbf24, 1))
-      .on('pointerout', () => backButton.setFillStyle(0xf59e0b, 1))
-      .on('pointerdown', () => {
-        this.scene.start('MenuScene');
-      });
+        .on('pointerout', () => backButton.setFillStyle(0xf59e0b, 1))
+        .on('pointerdown', () => {
+          this.onExitToMenu?.();
+    });
 
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
@@ -399,7 +400,7 @@ export class MainScene extends Phaser.Scene {
 
     this.character.destroy();
     this.character = null;
-    this.scene.start('MenuScene');
+    this.onExitToMenu?.();
   }
 
   createEnemy() {
