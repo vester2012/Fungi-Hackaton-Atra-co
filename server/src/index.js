@@ -221,7 +221,11 @@ io.on('connection', (socket) => {
 
     // 1. Удаляем игрока из списка активных на сервере,
     // чтобы он не участвовал в рассылках позиций
-    delete activePlayers[socket.id];
+
+    if (player.roomId) {
+      socket.leave(player.roomId);
+    }
+    //delete activePlayers[socket.id];
 
     // 2. Оповещаем комнату, что этот объект игрока нужно уничтожить
     // Мы используем существующее событие 'playerDisconnected',
@@ -364,12 +368,13 @@ function joinToRoom( socket, data, ismm ) {
 
     console.log(`Игрок ${player.username} зашел в комнату ${room.info.name} (${idRoom})`);
 
-    // 4. Сообщаем клиенту, что вход успешен
-    socket.emit('joined_room_success' + prefix, { roomId: idRoom });
+
 
     // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
 
     getPlayersAndEnemiesByRoom(socket, prefix, room);
+    // 4. Сообщаем клиенту, что вход успешен
+    socket.emit('joined_room_success' + prefix, { roomId: idRoom });
     // Оповещаем остальных ВНУТРИ комнаты
     socket.to(idRoom).emit('newPlayer' + prefix, player);
   }
