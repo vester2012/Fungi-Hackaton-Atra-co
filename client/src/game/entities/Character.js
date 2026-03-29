@@ -15,7 +15,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitboxOffsetY = -44;
 
     // Создание хитбокса
-    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 120, 170, 0x38bdf8, 0.18).setStrokeStyle(2, 0x7dd3fc, 0.9);
+    this.hitbox = scene.add.rectangle(x, y + this.hitboxOffsetY, 120, 170, 0x38bdf8, 0).setVisible(false);
     scene.physics.add.existing(this.hitbox);
 
     // Ссылка для ZoneManager
@@ -103,7 +103,7 @@ export class Character extends Phaser.GameObjects.Container {
       this.add(this.healthIndicator);
     }
 
-    this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0.2).setStrokeStyle(2, 0xfb923c, 0.95).setVisible(false);
+    this.attackHitbox = scene.add.rectangle(x, y, this.attackWidth, this.attackHeight, 0xf97316, 0).setVisible(false);
 
     this.syncHpText();
     this.events = new Phaser.Events.EventEmitter();
@@ -332,7 +332,7 @@ export class Character extends Phaser.GameObjects.Container {
     const isActive = this.isAttacking();
     const directionOffset = (this.hitbox.width * 0.5 + this.attackWidth * 0.5) * this.facingDirection;
     this.attackHitbox.setPosition(Math.round(this.hitbox.x + directionOffset), Math.round(this.hitbox.y - 8));
-    this.attackHitbox.setVisible(isActive);
+    this.attackHitbox.setVisible(false);
   }
 
   applyFacingDirection(direction) {
