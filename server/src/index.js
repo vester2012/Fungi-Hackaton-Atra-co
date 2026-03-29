@@ -4,7 +4,8 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid'); // Если нет uuid, используйте Math.random().toString(36)
 
-const setupSocketHandlers = require('./soket/main'); // Импортируем наш коорддинатор
+const setupSocketHandlers = require('./soket/main');
+const {getPlayerDamage} = require("./distributions/player_distribution"); // Импортируем наш коорддинатор
 
 const app = express();
 const server = http.createServer(app);
@@ -110,6 +111,7 @@ io.on('connection', (socket) => {
         sessionId: sessionId,
         username: data.username || `Guest_${socket.id.substring(0, 4)}`,
         hp: 100,
+        damage: getPlayerDamage(),
         tint: data.tint || 0xffffff,
         score: 0
       };
@@ -127,6 +129,7 @@ io.on('connection', (socket) => {
       sessionId: player.sessionId,
       username: player.username,
       hp: player.hp,
+      damage: player.damage,
       tint: player.tint, // Отправляем тинт обратно
       x: player.x,
       y: player.y
@@ -231,9 +234,10 @@ io.on('connection', (socket) => {
     const player = activePlayers[socket.id];
     const target = activePlayers[data.targetId];
     if (target && player && player.roomId) {
-      target.hp = Math.max(0, target.hp - data.damage);
+      const damage = getPlayerDamage();
+      target.hp = Math.max(0, target.hp - damage);
       // Рассылка только в текущую комнату
-      io.to(player.roomId).emit('hpUpdate', { id: data.targetId, hp: target.hp, attackerId: socket.id, damage: data.damage });
+      io.to(player.roomId).emit('hpUpdate', { id: data.targetId, hp: target.hp, attackerId: socket.id, damage });
     }
   });
 
