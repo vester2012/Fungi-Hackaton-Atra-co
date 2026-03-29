@@ -102,8 +102,14 @@ socket.on('loginSuccess', (data) => {
 
 socket.on('enemyDied', (data) => {
     const enemyEntry = unit_manager.info.enemies[data.id];
+    if (enemyEntry) {
+        enemyEntry.alive = false;
+        enemyEntry.hp = 0;
+    }
     if (enemyEntry && enemyEntry.obj) {
-        enemyEntry.obj.destroy(); // Враг исчезнет у всех в комнате
+        enemyEntry.obj.setHp?.(0);
+        enemyEntry.obj.destroy();
+        enemyEntry.obj = null;
     }
 });
 // Получаем список всех игроков при входе
@@ -112,7 +118,29 @@ socket.on('currentPlayers', (serverPlayers) => {
 });
 
 socket.on('currentEnemies', (serverEnemies) => {
-    Object.assign(unit_manager.info.enemies, serverEnemies);
+    unit_manager.info.enemies = { ...serverEnemies };
+});
+
+socket.on('enemiesState', (serverEnemies) => {
+    const nextEnemies = {};
+
+    Object.entries(serverEnemies).forEach(([id, enemyState]) => {
+        nextEnemies[id] = {
+            ...(unit_manager.info.enemies[id] || {}),
+            ...enemyState,
+            obj: unit_manager.info.enemies[id]?.obj || null
+        };
+    });
+
+    unit_manager.info.enemies = nextEnemies;
+});
+
+socket.on('enemyRespawned', (enemyInfo) => {
+    unit_manager.info.enemies[enemyInfo.id] = {
+        ...(unit_manager.info.enemies[enemyInfo.id] || {}),
+        ...enemyInfo,
+        obj: null
+    };
 });
 
 // Новый игрок зашел
@@ -163,9 +191,10 @@ socket.on('hpUpdate', (data) => {
 
 socket.on('enemyHpUpdate', (data) => {
     const enemyEntry = unit_manager.info.enemies[data.id];
-    // Аналогичная проверка для врагов
-    if (enemyEntry && enemyEntry.obj && enemyEntry.obj.active) {
+    if (enemyEntry) {
         enemyEntry.hp = data.hp;
+    }
+    if (enemyEntry && enemyEntry.obj && enemyEntry.obj.active) {
         enemyEntry.obj.setHp(data.hp);
     }
 });

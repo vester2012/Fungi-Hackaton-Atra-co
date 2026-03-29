@@ -95,6 +95,29 @@ export class FlyingEnemy extends Enemy {
     }
   }
 
+  applyServerState(state, time = this.scene.time.now) {
+    super.applyServerState(state, time);
+
+    if (!state || !this.visual?.state) {
+      return;
+    }
+
+    this.visual.scaleX = this.facingDirection < 0 ? Math.abs(this.visual.scaleX) : -Math.abs(this.visual.scaleX);
+
+    if (state.alive === false) {
+      this.visual.state.setAnimation(0, 'dead', false);
+      return;
+    }
+
+    if (state.state === 'attack') {
+      this.visual.state.setAnimation(0, 'attack', false);
+      this.visual.state.addAnimation(0, 'idle', true, 0);
+      return;
+    }
+
+    this.visual.state.setAnimation(0, 'idle', true);
+  }
+
   takeDamage(amount, attackId = 0) {
     if (attackId && this.lastHitByAttackId === attackId) {
       return false;
