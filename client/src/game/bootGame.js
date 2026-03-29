@@ -1,7 +1,7 @@
 import { BootScene } from './scenes/BootScene.js';
 import { MainScene } from './scenes/MainScene.js';
 
-export function bootGame(parent, ui = {}) {
+export function bootGame(parent) {
   const Phaser = window.Phaser;
   const SpinePlugin = window.SpinePlugin;
 
@@ -36,6 +36,6 @@ export function bootGame(parent, ui = {}) {
           ]
           : []
     },
-    scene: [BootScene, new MainScene(ui)]
+    scene: [BootScene, MainScene]
   });
 }
