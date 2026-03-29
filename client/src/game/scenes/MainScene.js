@@ -31,6 +31,9 @@ export class MainScene extends Phaser.Scene {
     this.hearts = 0;
     this.heartsConstNumber = 3;
     this.heartHealing = 25;
+    this.persentOfMina = 0.7;
+    this.bombaDemage = 0.7;
+    this.bombasCount = 0;
 
     // Базовые массивы для данных из JSON
     this.enemySpawns = [];
@@ -77,7 +80,11 @@ export class MainScene extends Phaser.Scene {
       targetFlyingCount: 2
     });
     this.createHud(viewWidth);
+    this.containerForBust = this.add.container(0, 0);
     this.setRandomPosForBlackHoles();
+    this.generateHearts();
+    this.createMines();
+    this.createBombas();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
@@ -105,7 +112,6 @@ export class MainScene extends Phaser.Scene {
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
     this.createDebugZoomControls(viewWidth);
-    this.generateHearts();
   }
 
   // --- ИНТЕГРАЦИЯ РЕДАКТОРА УРОВНЕЙ ---
@@ -225,12 +231,29 @@ export class MainScene extends Phaser.Scene {
 
     this.positionsForHeart =[
       {x: 1400 * s, y: 580 * s, active: false},
-      {x: 1700 * s, y: 470 * s, active: false},
+      {x: 1660 * s, y: 470 * s, active: false},
       {x: 1800 * s, y: 230 * s, active: false},
       {x: 1100 * s, y: 420 * s, active: false},
       {x: 820 * s, y: 240 * s, active: false},
       {x: 760 * s, y: 490 * s, active: false},
       {x: 360 * s, y: 410 * s, active: false}
+    ];
+
+    this.positionsForMines =[
+      {x: 1100 * s, y: 890 * s, active: false},
+      {x: 1740 * s, y: 500 * s, active: false},
+      {x: 1200 * s, y: 710 * s, active: false},
+      {x: 1500 * s, y: 600 * s, active: false},
+      {x: 850 * s, y: 515 * s, active: false}
+    ];
+
+     this.positionsForBombas =[
+      //{x: 600 * s, y: 890 * s, active: false},
+      //{x: 300 * s, y: 890 * s, active: false}
+      //{x: 1000 * s, y: 890 * s, active: false},
+      //{x: 1900 * s, y: 890 * s, active: false},
+      {x: 450 * s, y: 435 * s, active: false},
+      //{x: 850 * s, y: 515 * s, active: false}
     ];
   }
 
@@ -597,6 +620,7 @@ export class MainScene extends Phaser.Scene {
         pos.active = true;
         
         heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
+        this.containerForBust.add(heart);
         this.hearts += 1;
         heart.posRef = pos;
         
@@ -635,7 +659,6 @@ export class MainScene extends Phaser.Scene {
   onHeartTouch(heart, heartZone){
     if (this.heartTouched) return;
   
-    console.log(heart)
     this.heartTouched = true;
     console.log("heartTouched");
     
@@ -678,5 +701,151 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
+  }
+
+  createMines(){
+     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForMines]);
+     const pos1 = shuffled[0];
+     const pos2 = shuffled[1];
+     const pos3 = shuffled[1];
+
+     const mina1 = this.add.image(pos1.x, pos1.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina1);
+     const mina2 = this.add.image(pos2.x, pos2.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina2);
+     const mina3 = this.add.image(pos3.x, pos3.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina3);
+     this.addPhysicForNewMina(mina1);
+     this.addPhysicForNewMina(mina2);
+     this.addPhysicForNewMina(mina3);
+  }
+
+  addPhysicForNewMina(mina){
+    const minaZone = this.add.zone(
+      mina.x,
+      mina.y,
+      10 * WORLD_SCALE,
+      10 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(minaZone);
+
+    minaZone.body.setAllowGravity(false);
+    minaZone.body.setImmovable(true);
+
+    if (this.character) {
+      this.physics.add.overlap(this.character.getPhysicsTarget(), minaZone, this.onMinaTouch.bind(this, mina, minaZone), null, this);
+    }
+  }
+
+  onMinaTouch(mina, minaZone){
+    if (this.minaTouched) return;
+  
+    this.minaTouched = true;
+    console.log("minaTouched");
+    
+    // удаляем hp
+    const curHp = this.character.getHp();
+    const nextHp = Math.round(curHp*this.persentOfMina);
+    this.character.setHp(nextHp);
+
+    if (minaZone.overlapRef) {
+        minaZone.overlapRef.destroy();
+        minaZone.overlapRef = null;
+    }
+    if (minaZone.body) {
+        minaZone.body.destroy();
+    }
+    
+    minaZone.destroy();
+     // взрыв ???
+    // прячем мину
+    this.tweens.add({
+      targets: mina,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        if (mina) {
+          mina.destroy();
+        }
+        this.minaTouched = false;
+      }
+    });
+  }
+
+  createBombas(){
+     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForBombas]);
+     const pos1 = shuffled[0];
+     //const pos2 = shuffled[1];
+     //const pos3 = shuffled[1];
+
+     const bomba1 = this.add.image(pos1.x, pos1.y, 'bomba').setScale(0.13);
+     this.containerForBust.add(bomba1);
+     //const bomba2 = this.add.image(pos2.x, pos2.y, 'bomba').setScale(0.13);
+     //this.containerForBust.add(bomba2);
+     //const bomba3 = this.add.image(pos3.x, pos3.y, 'bomba').setScale(0.13);
+     //this.containerForBust.add(bomba3);
+     this.addPhysicForNewBomba(bomba1);
+     //this.addPhysicForNewBomba(bomba2);
+     //this.addPhysicForNewBomba(bomba3);
+  }
+
+  addPhysicForNewBomba(bomba){
+    const bombaZone = this.add.zone(
+      bomba.x,
+      bomba.y,
+      10 * WORLD_SCALE,
+      10 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(bombaZone);
+
+    bombaZone.body.setAllowGravity(false);
+    bombaZone.body.setImmovable(true);
+
+    if (this.character) {
+      this.physics.add.overlap(this.character.getPhysicsTarget(), bombaZone, this.onBombaTouch.bind(this, bomba, bombaZone), null, this);
+    }
+  }
+
+  onBombaTouch(bomba, bombaZone){
+    if (this.bombaTouched) return;
+  
+    this.bombaTouched = true;
+    console.log("bombaTouched");
+    
+
+    if (bombaZone.overlapRef) {
+        bombaZone.overlapRef.destroy();
+        bombaZone.overlapRef = null;
+    }
+    if (bombaZone.body) {
+        bombaZone.body.destroy();
+    }
+    
+    bombaZone.destroy();
+    // добавляем в счетчик бомб
+    this.bombasCount++;
+
+    // прячем бомбу
+    this.tweens.add({
+      targets: bomba,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        if (bomba) {
+          bomba.destroy();
+        }
+        this.bombaTouched = false;
+      }
+    });
+  }
+
+  toUseBomba(){
+    if(this.bombasCount === 0) return;
+    this.bombasCount--;
+    // анимация кидания бомбы
+
+    // hp врага падает на параметр this.bombaDemage
   }
 }
