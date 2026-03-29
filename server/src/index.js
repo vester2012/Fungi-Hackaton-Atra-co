@@ -74,48 +74,40 @@ io.on('connection', (socket) => {
   socket.on('login', (data) => {
     let sessionId = data.sessionId;
     let player;
-
     const spawnPoint = getRandomSpawnPoint();
 
-    // 1. Проверяем, существует ли сессия
     if (sessionId && sessionDatabase[sessionId]) {
       player = sessionDatabase[sessionId];
-      console.log(`Игрок вернулся по сессии: ${player.username}`);
+      if (data.tint) player.tint = data.tint; // Обновляем цвет, если пришел новый
     } else {
-      // 2. Если сессии нет, создаем нового игрока
-      sessionId = uuidv4(); // Генерируем новый ID сессии
+      sessionId = uuidv4();
       player = {
         sessionId: sessionId,
         username: data.username || `Guest_${socket.id.substring(0, 4)}`,
         hp: 100,
-        color: '#' + Math.floor(Math.random()*16777215).toString(16),
+        tint: data.tint || 0xffffff,
         score: 0
       };
       sessionDatabase[sessionId] = player;
-      console.log(`Новый игрок создан: ${player.username}`);
     }
 
+    // Привязываем актуальные данные к сессии
+    player.id = socket.id;
     player.x = spawnPoint.x;
     player.y = spawnPoint.y;
-
-    // Привязываем актуальный socket.id к объекту игрока
-    player.id = socket.id;
     activePlayers[socket.id] = player;
 
-    // Отправляем игроку подтверждение и его sessionId (он его сохранит)
     socket.emit('loginSuccess', {
       id: socket.id,
       sessionId: player.sessionId,
       username: player.username,
       hp: player.hp,
+      tint: player.tint, // Отправляем тинт обратно
       x: player.x,
       y: player.y
     });
 
-    // Синхронизация мира
-   // socket.emit('currentPlayers', activePlayers);
     socket.emit('currentEnemies', enemies);
-    //socket.broadcast.emit('newPlayer', player);
   });
 
   // Все остальные события используют activePlayers[socket.id]

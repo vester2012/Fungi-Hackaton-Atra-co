@@ -31,7 +31,15 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.cameras.main.setBackgroundColor('#0f172a');
-
+    this.colors = [
+      { name: 'Default', value: 0xffffff },
+      { name: 'Gold', value: 0xffd700 },
+      { name: 'Red', value: 0xff4d4d },
+      { name: 'Neon Green', value: 0x32ff7e },
+      { name: 'Sky Blue', value: 0x18dcff },
+      { name: 'Pink', value: 0xff9ff3 }
+    ];
+    this.currentColorIndex = parseInt(localStorage.getItem('player_color_index')) || 0;
     this.add.rectangle(width * 0.5, height * 0.5, width, height, 0x0b1020, 1);
     this.add.rectangle(width * 0.5, height * 0.5, 900, 560, 0x111827, 0.92);
 
@@ -88,6 +96,12 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
+    this.colorButton = this.createMenuButton(width * 0.5, 630 * 1.35, 360, 64,
+        `Color: ${this.colors[this.currentColorIndex].name}`, 0x5758bb, () => {
+          this.changePlayerColor();
+        });
+
+
     this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
 
     });
@@ -103,7 +117,20 @@ export class MenuScene extends Phaser.Scene {
       }
     });
   }
+  changePlayerColor() {
+    this.currentColorIndex = (this.currentColorIndex + 1) % this.colors.length;
+    const selected = this.colors[this.currentColorIndex];
 
+    // Сохраняем выбор
+    localStorage.setItem('player_color_index', this.currentColorIndex);
+    localStorage.setItem('player_tint', selected.value);
+
+    // Обновляем текст на кнопке
+    // В createMenuButton текст доступен как часть объекта, если ты изменишь возврат функции
+    // Или просто найди объект по координатам/ссылке.
+    // Для простоты — перерисуем сцену или обновим текст:
+    this.scene.restart();
+  }
   createMenuButton(x, y, width, height, label, color, onClick) {
     const button = this.add.rectangle(x, y, width, height, color, 1).setInteractive({ useHandCursor: true });
 

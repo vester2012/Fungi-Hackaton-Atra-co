@@ -69,34 +69,37 @@ const socket = io(SOCKET_URL, {
 });
 let players = unit_manager.info.players;
 
+socket.on('connect', () => {
+    unit_manager.my_id = socket.id;
+});
 
+// 1. Собираем данные для входа ОДИН РАЗ
+let savedSession = localStorage.getItem('game_session_id');
+let savedName = localStorage.getItem('game_username');
+const savedTint = parseInt(localStorage.getItem('player_tint')) || 0xffffff;
 
-socket.on('connect', () => { unit_manager.my_id = socket.id; });
-
-// Логика на клиенте (Phaser / JS)
-const savedSession = localStorage.getItem('game_session_id');
-const savedName = localStorage.getItem('game_username');
-
-if (!savedSession) {
-    const name = prompt("Введите ник для регистрации:");
-    localStorage.setItem('game_username', name);
-    // Отправляем пустую сессию и ник
-    socket.emit('login', { sessionId: null, username: name });
-} else {
-    // Отправляем старую сессию (ник сервер возьмет из базы)
-    socket.emit('login', { sessionId: savedSession });
+// Если имени нет в истории, спрашиваем
+if (!savedName) {
+    savedName = prompt("Введите ник для регистрации:") || `Fish_${Math.floor(Math.random()*1000)}`;
+    localStorage.setItem('game_username', savedName);
 }
 
+// 2. ЕДИНСТВЕННЫЙ вызов логина при старте
+socket.emit('login', {
+    sessionId: savedSession, // Сервер создаст новую, если эта null
+    username: savedName,
+    tint: savedTint
+});
 
 
 // Когда сервер подтвердил логин
 socket.on('loginSuccess', (data) => {
     // Сохраняем ID сессии на будущее
     localStorage.setItem('game_session_id', data.sessionId);
-    console.log(`Залогинены как ${data.username}`);
-
-    // ТУТ инициализируем вашего игрока в Phaser
+    console.log(`Залогинены как ${data.username} с цветом ${data.tint}`);
+    // Здесь можно инициализировать что-то специфичное для вашего игрока
 });
+
 socket.on('enemyDied', (data) => {
     const enemyEntry = unit_manager.info.enemies[data.id];
     if (enemyEntry && enemyEntry.obj) {
@@ -122,6 +125,10 @@ socket.on('playerMoved', (playerInfo) => {
     if (players[playerInfo.id]) {
         players[playerInfo.id].x = playerInfo.x;
         players[playerInfo.id].y = playerInfo.y;
+        // Важно: сохраняем тинт, который прислал сервер для этого игрока
+        if (playerInfo.tint !== undefined) {
+            players[playerInfo.id].tint = playerInfo.tint;
+        }
         if (typeof playerInfo.hp === 'number') {
             players[playerInfo.id].hp = playerInfo.hp;
             if (players[playerInfo.id].obj?.setHp) {
@@ -162,7 +169,7 @@ socket.on('enemyHpUpdate', (data) => {
         enemyEntry.obj.setHp(data.hp);
     }
 });
-//unit_manager.socket.emit("create_room", { sid: localStorage.getItem('game_session_id'), roomName, roomPass});
+
 socket.on('update_list_rooms', (data) => {
     unit_manager.rooms = data.list_rooms;
 });

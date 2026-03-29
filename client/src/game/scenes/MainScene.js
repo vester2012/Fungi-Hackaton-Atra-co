@@ -70,6 +70,7 @@ export class MainScene extends Phaser.Scene {
 
     // Инициализация персонажа на точке спавна
     this.createCharacter();
+
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
     this.createEnemiesBot();
     this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
@@ -268,14 +269,22 @@ export class MainScene extends Phaser.Scene {
   updateEnemysPlayers(time, delta) {
     let players = unit_manager.info.players;
     for (const [id, data] of Object.entries(players)) {
-      if(id !== unit_manager.my_id) {
-        if (!data.obj) data.obj = this.createEnemy();
+      if (id !== unit_manager.my_id) {
+        if (!data.obj) {
+          data.obj = this.createEnemy();
+          // При создании сразу задаем ник и цвет
+          if (data.username) data.obj.healthIndicator.setNickname(data.username);
+        }
 
-        // Передаем time в applyRemoteState если там есть логика анимаций
+        // Синхронизируем цвет, если он изменился или еще не применен
+        if (data.tint !== undefined && data.obj.currentTint !== data.tint) {
+          data.obj.setSlotColor('body', data.tint);
+        }
+
         data.obj.applyRemoteState(data.x, data.y, time);
-
         if (typeof data.hp === 'number') data.obj.setHp(data.hp);
 
+        // Обработка атаки
         if (data.pendingAttackId && data.pendingAttackId !== data.lastPlayedAttackId) {
           data.lastPlayedAttackId = data.pendingAttackId;
           data.obj.playRemoteAttack(time);
@@ -402,30 +411,35 @@ export class MainScene extends Phaser.Scene {
   createCharacter() {
     const playerState = unit_manager.info.players[unit_manager.my_id] || { id: unit_manager.my_id };
 
-    // Используем динамический спавн
-    const startX = playerState.x ?? this.spawnPoint.x;
-    const startY = playerState.y ?? this.spawnPoint.y;
-
-    this.character = new Character(this, startX, startY, {
+    // Сначала создаем объект
+    this.character = new Character(this, playerState.x ?? this.spawnPoint.x, playerState.y ?? this.spawnPoint.y, {
       showStats: true,
       nickname: playerState.username || 'Player'
     });
+
+    // Красим своего персонажа цветом из localStorage
+    const myTint = parseInt(localStorage.getItem('player_tint')) || 0xffffff;
+    this.character.setSlotColor('body', myTint);
+
+    // Сохраняем в стейт, чтобы сервер знал наш цвет
+    playerState.tint = myTint;
     playerState.obj = this.character;
     playerState.hp = this.character.getHp();
     unit_manager.info.players[unit_manager.my_id] = playerState;
 
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
+
     this.physics.add.collider(
-      this.character.getPhysicsTarget(),
-      this.platforms,
-      undefined,
-      (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
+        this.character.getPhysicsTarget(),
+        this.platforms,
+        undefined,
+        (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
     );
 
     this.character.events.on('attack', () => {
       this.getCollisionAttack();
-    })
+    });
   }
 
   createEnemiesBot() {
@@ -489,33 +503,21 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleCharacterDeath() {
-    if (!this.character || this.isReturningToMenu || !this.character.isDead()) {
-      return;
-    }
+    if (!this.character || this.isReturningToMenu || !this.character.isDead()) return;
 
     this.isReturningToMenu = true;
+    if (unit_manager.socket) unit_manager.socket.emit('playerDied');
 
-    // 1. Немедленно сообщаем серверу
-    if (unit_manager.socket) {
-      unit_manager.socket.emit('playerDied');
-    }
-
-    // 2. Останавливаем камеру
     this.cameras.main.stopFollow();
 
-    // 3. Очищаем данные в глобальном менеджере ПЕРЕД удалением объекта
+    // Очищаем объект в менеджере
     if (unit_manager.info.players[unit_manager.my_id]) {
-      // Мы НЕ удаляем запись совсем (чтобы не было ошибок в других методах),
-      // но зануляем объект
       unit_manager.info.players[unit_manager.my_id].obj = null;
+      // ВАЖНО: не удаляйте поле .tint, чтобы сервер его помнил!
     }
 
-    // 4. Уничтожаем персонажа
-    const charToDestroy = this.character;
-    this.character = null; // update() больше не будет работать для него
-    charToDestroy.destroy();
-
-    // 5. Переходим в меню
+    this.character.destroy();
+    this.character = null;
     this.scene.start('MenuScene');
   }
 

@@ -174,7 +174,9 @@ export class Character extends Phaser.GameObjects.Container {
         this.setAnimation(movingHorizontally ? 'run' : 'idle', true);
       }
     }
-
+    if (this.currentTint !== undefined) {
+      this.applySlotColor('body', this.currentTint);
+    }
     this.syncContainerToHitbox();
   }
 
@@ -398,7 +400,25 @@ export class Character extends Phaser.GameObjects.Container {
     this.currentAnimation = name;
     this.anim.play(name, loop);
   }
-
+  /**
+   * Устанавливает цвет для конкретного слота Spine
+   * @param {string} slotName - Имя слота из Spine (например, 'body', 'hat', 'hand_l')
+   * @param {number} colorHex - Цвет в формате 0xRRGGBB
+   */
+  setSlotColor(slotName, colorHex) {
+    this.currentTint = colorHex; // Запоминаем для update
+    this.applySlotColor(slotName, colorHex);
+  }
+  applySlotColor(slotName, colorHex) {
+    if (!this.anim || !this.anim.skeleton) return;
+    const slot = this.anim.skeleton.findSlot(slotName);
+    if (slot) {
+      const phaserColor = Phaser.Display.Color.ValueToColor(colorHex);
+      slot.color.r = phaserColor.red / 255;
+      slot.color.g = phaserColor.green / 255;
+      slot.color.b = phaserColor.blue / 255;
+    }
+  }
   destroy(fromScene) {
     // 1. Снимаем все слушатели с собственного эмиттера
     if (this.events) {
