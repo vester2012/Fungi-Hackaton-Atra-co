@@ -24,7 +24,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.damageFlashTimer = null;
     this.showStats = options.showStats ?? true;
 
-    this.hitbox = scene.add.rectangle(x, y - 38, 76, 116, 0xef4444, 0.2).setStrokeStyle(2, 0xfca5a5, 0.95);
+    this.hitbox = scene.add.rectangle(x, y - 38, 76, 116, 0xef4444, 0).setVisible(false);
     scene.physics.add.existing(this.hitbox);
     this.hitbox.body.setCollideWorldBounds(true);
     this.hitbox.body.setBounce(0, 0);
@@ -46,7 +46,7 @@ export class Enemy extends Phaser.GameObjects.Container {
       textStroke: '#450a0a'
     });
 
-    this.attackZone = scene.add.rectangle(x, y - 24, 45, 45, 0xf59e0b, 0.14).setStrokeStyle(2, 0xfbbf24, 0.95);
+    this.attackZone = scene.add.rectangle(x, y - 24, 45, 45, 0xf59e0b, 0).setVisible(false);
   }
 
   update(time, delta, player) {
@@ -65,7 +65,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.facingDirection = state.facingDirection ?? this.facingDirection;
     this.hp = Phaser.Math.Clamp(state.hp ?? this.hp, 0, this.maxHp);
     this.hitbox.body.enable = state.alive !== false;
-    this.attackZone.setVisible(state.alive !== false);
+    this.attackZone.setVisible(false);
 
     if (typeof state.x === 'number' && typeof state.y === 'number') {
       this.hitbox.body.reset(state.x, state.y);

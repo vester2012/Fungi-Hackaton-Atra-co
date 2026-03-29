@@ -97,7 +97,7 @@ export class MainScene extends Phaser.Scene {
 
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
-    this.createDebugZoomControls(viewWidth);
+    //this.createDebugZoomControls(viewWidth);
 
     // [FIX] Подключаем критические слушатели для удаления призраков и синхронизации
     this.setupSocketListeners();

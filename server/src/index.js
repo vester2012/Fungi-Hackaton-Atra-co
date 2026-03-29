@@ -272,13 +272,14 @@ function joinToRoom(socket, data, ismm) {
 
     if (!room.enemies) room.enemies = createRoomEnemies();
 
-    socket.emit('joined_room_success' + prefix, { roomId: room.info.id });
+    // 4. Сообщаем клиенту, что вход успешен
+    socket.emit('joined_room_success' + prefix, { roomId: idRoom });
 
-    // [FIX] Здесь раньше был `socket`, теперь передаем `io`, чтобы все в комнате получили данные
-    getPlayersAndEnemiesByRoom(io, prefix, room);
+    // 5. Синхронизируем ТОЛЬКО тех, кто в этой комнате
 
-    // Также персонально кидаем остальным новичка
-    socket.to(room.info.id).emit('newPlayer' + prefix, player);
+    getPlayersAndEnemiesByRoom(socket, prefix, room);
+    // Оповещаем остальных ВНУТРИ комнаты
+    socket.to(idRoom).emit('newPlayer' + prefix, player);
   }
 }
 
