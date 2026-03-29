@@ -10,11 +10,6 @@ import {ParallaxBackground} from "../systems/ParallaxBackground";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
-const ENEMY_SPAWNS = [
-  { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE, type: 'ground' }
-];
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -53,8 +48,6 @@ export class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
-    // this.drawBackground(this.worldWidth, this.worldHeight);
-
     this.platforms = this.physics.add.staticGroup();
     this.zoneManager = new ZoneManager(this);
     this.parallax = new ParallaxBackground(this, 'sky_layer_', 8);
@@ -86,9 +79,7 @@ export class MainScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0);
 
     // UI Возврата
-    const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1)
-      .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
+    const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1).setInteractive({ useHandCursor: true }).setScrollFactor(0);
 
     const backLabel = this.add.text(viewWidth * 0.5, viewHeight - 90, 'Back To Menu', {
       fontFamily: 'JungleAdventurer',
@@ -140,12 +131,7 @@ export class MainScene extends Phaser.Scene {
     // 2. Расставляем Точки (Спавны, Враги, Лут)
     let enemyIdx = 1;
     levelData.points.forEach(pt => {
-      if (pt.type === 'spawn') {
-        this.spawnPoint = { x: pt.x, y: pt.y };
-        const spawnCircle = this.add.circle(pt.x, pt.y, 22, 0xff7043, 0.4).setStrokeStyle(5, 0xffcc80, 0.9);
-        this.add.text(pt.x + 40, pt.y - 6, 'Spawn', { fontFamily: 'JungleAdventurer', fontSize: '20px', color: '#fff3e0' });
-      }
-      else if (pt.type === 'enemy') {
+      if (pt.type === 'enemy') {
         this.enemySpawns.push({ id: `enemy-json-${enemyIdx++}`, x: pt.x, y: pt.y, type: 'ground' });
       }
       else if (pt.type === 'heart') {
@@ -299,8 +285,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     if (this.textInfo) {
-      this.textInfo.setText("info socket:" + "\n" + str)
-
+      this.textInfo.setText("info socket:" + "\n" + str);
     } else {
       this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
     }
@@ -335,45 +320,6 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  drawBackground(width, height) {
-    const s = WORLD_SCALE;
-
-    this.add.rectangle(width * 0.5, height * 0.5, width, height, 0x132238, 1);
-    this.add.ellipse(260 * s, 180 * s, 260 * s, 260 * s, 0xf3d17a, 0.16);
-    this.add.ellipse(width - 220 * s, 160 * s, 320 * s, 220 * s, 0x8ec5ff, 0.09);
-
-    const graphics = this.add.graphics();
-
-    graphics.fillStyle(0x1a2d46, 1);
-    graphics.beginPath();
-    graphics.moveTo(0, height * 0.62);
-    graphics.lineTo(220 * s, height * 0.48);
-    graphics.lineTo(520 * s, height * 0.58);
-    graphics.lineTo(760 * s, height * 0.43);
-    graphics.lineTo(1030 * s, height * 0.56);
-    graphics.lineTo(1340 * s, height * 0.39);
-    graphics.lineTo(1660 * s, height * 0.53);
-    graphics.lineTo(width, height * 0.45);
-    graphics.lineTo(width, height);
-    graphics.lineTo(0, height);
-    graphics.closePath();
-    graphics.fillPath();
-
-    graphics.fillStyle(0x203753, 0.95);
-    graphics.beginPath();
-    graphics.moveTo(0, height * 0.72);
-    graphics.lineTo(340 * s, height * 0.61);
-    graphics.lineTo(670 * s, height * 0.68);
-    graphics.lineTo(990 * s, height * 0.58);
-    graphics.lineTo(1320 * s, height * 0.71);
-    graphics.lineTo(1650 * s, height * 0.63);
-    graphics.lineTo(width, height * 0.7);
-    graphics.lineTo(width, height);
-    graphics.lineTo(0, height);
-    graphics.closePath();
-    graphics.fillPath();
-  }
-
   addPlatformBody(x, y, width, height, options = {}) {
     const platform = new Platform(this, x, y, width, height, options);
     this.platforms.add(platform.getPhysicsTarget());
@@ -402,12 +348,7 @@ export class MainScene extends Phaser.Scene {
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
 
-    this.physics.add.collider(
-        this.character.getPhysicsTarget(),
-        this.platforms,
-        undefined,
-        (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
-    );
+    this.physics.add.collider(this.character.getPhysicsTarget(), this.platforms, undefined, (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform));
 
     this.character.events.on('attack', () => {
       this.getCollisionAttack();
@@ -491,10 +432,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   createDebugButton(x, y, label, onClick) {
-    const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95)
-      .setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
-    const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' })
-      .setOrigin(0.5).setScrollFactor(0);
+    const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95).setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+    const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' }).setOrigin(0.5).setScrollFactor(0);
     button.on('pointerover', () => button.setFillStyle(0x475569, 0.98))
           .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
           .on('pointerdown', onClick);
@@ -575,42 +514,41 @@ export class MainScene extends Phaser.Scene {
 
   generateHearts(delayedTime = 0) {
     this.time.delayedCall(delayedTime, () => {
-        if(this.hearts >= this.heartsConstNumber) {
-          this.generateHearts(5000);
-          return;
+      if (this.hearts >= this.heartsConstNumber) {
+        this.generateHearts(5000);
+        return;
+      } else {
+        const heartsLength = this.hearts;
+        for (let i = 1; i <= (this.heartsConstNumber - heartsLength); i++) {
+          this.addHeartToRandomPos();
         }
-        else {
-          const heartsLength = this.hearts;
-          for(let i = 1; i<= (this.heartsConstNumber - heartsLength); i++){
-            this.addHeartToRandomPos();
-          }
-          this.generateHearts(5000);
-        }
+        this.generateHearts(5000);
+      }
     });
   }
 
-  addHeartToRandomPos(){
+  addHeartToRandomPos() {
     let heart;
     const freePositions = this.positionsForHeart.filter(p => !p.active);
     if (freePositions.length > 0) {
-        const pos = Phaser.Utils.Array.GetRandom(freePositions);
-        pos.active = true;
-        
-        heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
-        this.hearts += 1;
-        heart.posRef = pos;
-        
-        this.addPhysicForNewHeart(heart);
+      const pos = Phaser.Utils.Array.GetRandom(freePositions);
+      pos.active = true;
 
-        heart.pulseTween = this.tweens.add({
-          targets: heart,
-          scaleX: 0.28,
-          scaleY: 0.28,
-          duration: 300,
-          ease: 'Sine.inOut',
-          yoyo: true,
-          repeat: -1 // бесконечно
-        });
+      heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
+      this.hearts += 1;
+      heart.posRef = pos;
+
+      this.addPhysicForNewHeart(heart);
+
+      heart.pulseTween = this.tweens.add({
+        targets: heart,
+        scaleX: 0.28,
+        scaleY: 0.28,
+        duration: 300,
+        ease: 'Sine.inOut',
+        yoyo: true,
+        repeat: -1 // бесконечно
+      });
     }
   }
 
