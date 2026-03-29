@@ -11,7 +11,8 @@ export class MenuScene extends Phaser.Scene {
     this.load.spine('blackhole_spine_SPO', '/assets/anim/blackhole_anim_spine.json', '/assets/anim/blackhole_anim_spine.atlas');
     this.load.spine('fish_SPO', '/assets/anim/fish.json', '/assets/anim/fish.atlas');
     this.load.spine('enemy_bee_SPO', '/assets/anim/enemy_bee.json', '/assets/anim/enemy_bee.atlas');
-    this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas')
+    this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas');
+    this.load.spine('dust_SPO', '/assets/anim/dust.json', '/assets/anim/dust.atlas')
 
     this.load.image('heart', '/assets/heart.png');
     this.load.image('mina', '/assets/mina.png');
