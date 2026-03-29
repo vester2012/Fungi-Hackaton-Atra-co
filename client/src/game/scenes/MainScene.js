@@ -15,6 +15,7 @@ export class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
     console.log(unit_manager.info.players);
+    this.createdMinas = false;
   }
 
   create() {
@@ -24,10 +25,11 @@ export class MainScene extends Phaser.Scene {
     const viewHeight = this.scale.height;
 
     this.hearts = 0;
+    this.minas = 0;
     this.heartsConstNumber = 3;
     this.heartHealing = 25;
-    this.persentOfMina = 0.7;
-    this.bombaDemage = 0.7;
+    this.persentOfMina = 0.5;
+    this.bombaDemage = 0.5;
     this.bombasCount = 0;
 
     // Базовые массивы для данных из JSON
@@ -77,7 +79,7 @@ export class MainScene extends Phaser.Scene {
     this.setRandomPosForBlackHoles();
     this.generateHearts();
     this.createMines();
-    this.createBombas();
+    //this.createBombas();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
@@ -234,12 +236,12 @@ export class MainScene extends Phaser.Scene {
     ];
 
      this.positionsForBombas =[
-      //{x: 600 * s, y: 890 * s, active: false},
-      //{x: 300 * s, y: 890 * s, active: false}
-      //{x: 1000 * s, y: 890 * s, active: false},
-      //{x: 1900 * s, y: 890 * s, active: false},
+      {x: 600 * s, y: 890 * s, active: false},
+      {x: 300 * s, y: 890 * s, active: false},
+      {x: 1000 * s, y: 890 * s, active: false},
+      {x: 1900 * s, y: 890 * s, active: false},
       {x: 450 * s, y: 435 * s, active: false},
-      //{x: 850 * s, y: 515 * s, active: false}
+      {x: 850 * s, y: 515 * s, active: false}
     ];
   }
 
@@ -595,18 +597,20 @@ export class MainScene extends Phaser.Scene {
     heartZone.body.setImmovable(true);
 
     if (this.character) {
-      this.physics.add.overlap(this.character.getPhysicsTarget(), heartZone, this.onHeartTouch.bind(this, heart, heartZone), null, this);
+      heartZone.overlapRef = this.physics.add.overlap(this.character.getPhysicsTarget(), heartZone, this.onHeartTouch.bind(this, heart, heartZone), null, this);
     }
   }
 
   onHeartTouch(heart, heartZone){
-    if (this.heartTouched) return;
-
-    console.log(heart)
-
-    this.heartTouched = true;
+    if (heart.heartTouched) return;
+  
+    heart.heartTouched = true;
     console.log("heartTouched");
 
+    if (heartZone.body) {
+      heartZone.body.enable = false;
+    }
+  
     // восстанавливаем hp
     const curHp = this.character.getHp();
     const maxHp = this.character.getMaxHp();
@@ -642,17 +646,19 @@ export class MainScene extends Phaser.Scene {
           if (heart.pulseTween) heart.pulseTween.stop();
           heart.destroy();
         }
-        this.heartTouched = false;
       }
     });
 
   }
 
   createMines(){
+     if(this.createdMinas || this.minas>2) return;
+     this.createdMinas = true;
+     this.minas = 3;
      const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForMines]);
      const pos1 = shuffled[0];
      const pos2 = shuffled[1];
-     const pos3 = shuffled[1];
+     const pos3 = shuffled[2];
 
      const mina1 = this.add.image(pos1.x, pos1.y, 'mina').setScale(0.13);
      this.containerForBust.add(mina1);
@@ -669,8 +675,8 @@ export class MainScene extends Phaser.Scene {
     const minaZone = this.add.zone(
       mina.x,
       mina.y,
-      10 * WORLD_SCALE,
-      10 * WORLD_SCALE
+      8 * WORLD_SCALE,
+      8 * WORLD_SCALE
     );
 
     this.physics.add.existing(minaZone);
@@ -679,15 +685,19 @@ export class MainScene extends Phaser.Scene {
     minaZone.body.setImmovable(true);
 
     if (this.character) {
-      this.physics.add.overlap(this.character.getPhysicsTarget(), minaZone, this.onMinaTouch.bind(this, mina, minaZone), null, this);
+      minaZone.overlapRef = this.physics.add.overlap(this.character.getPhysicsTarget(), minaZone, this.onMinaTouch.bind(this, mina, minaZone), null, this);
     }
   }
 
   onMinaTouch(mina, minaZone){
-    if (this.minaTouched) return;
+    if (mina.minaTouched) return;
   
-    this.minaTouched = true;
+    mina.minaTouched = true;
     console.log("minaTouched");
+
+    if (minaZone.body) {
+      minaZone.body.enable = false;
+    }
     
     // удаляем hp
     const curHp = this.character.getHp();
@@ -704,16 +714,18 @@ export class MainScene extends Phaser.Scene {
     
     minaZone.destroy();
      // взрыв ???
+    this.animMina = this.add.spine(mina.x, mina.y, 'dust_SPO', 'idle', false);
+    this.animMina.setScale(3);
+    this.animMina.setDepth(9999);
     // прячем мину
     this.tweens.add({
       targets: mina,
       alpha: 0,
-      duration: 300,
+      duration: 400,
       onComplete: () => {
         if (mina) {
           mina.destroy();
         }
-        this.minaTouched = false;
       }
     });
   }
@@ -721,18 +733,18 @@ export class MainScene extends Phaser.Scene {
   createBombas(){
      const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForBombas]);
      const pos1 = shuffled[0];
-     //const pos2 = shuffled[1];
-     //const pos3 = shuffled[1];
+     const pos2 = shuffled[1];
+     const pos3 = shuffled[2];
 
      const bomba1 = this.add.image(pos1.x, pos1.y, 'bomba').setScale(0.13);
      this.containerForBust.add(bomba1);
-     //const bomba2 = this.add.image(pos2.x, pos2.y, 'bomba').setScale(0.13);
-     //this.containerForBust.add(bomba2);
-     //const bomba3 = this.add.image(pos3.x, pos3.y, 'bomba').setScale(0.13);
-     //this.containerForBust.add(bomba3);
+     const bomba2 = this.add.image(pos2.x, pos2.y, 'bomba').setScale(0.13);
+     this.containerForBust.add(bomba2);
+     const bomba3 = this.add.image(pos3.x, pos3.y, 'bomba').setScale(0.13);
+     this.containerForBust.add(bomba3);
      this.addPhysicForNewBomba(bomba1);
-     //this.addPhysicForNewBomba(bomba2);
-     //this.addPhysicForNewBomba(bomba3);
+     this.addPhysicForNewBomba(bomba2);
+     this.addPhysicForNewBomba(bomba3);
   }
 
   addPhysicForNewBomba(bomba){
