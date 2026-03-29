@@ -5,7 +5,14 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const CLIENT_URL = process.env.CLIENT_URL;
+
+const io = new Server(server, {
+  cors: {
+    origin: CLIENT_URL || true,
+    methods: ['GET', 'POST']
+  }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
