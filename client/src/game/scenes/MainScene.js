@@ -77,9 +77,7 @@ export class MainScene extends Phaser.Scene {
       targetFlyingCount: 2
     });
     this.createHud(viewWidth);
-    this.createBlackHole({x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE});
-    this.createBlackHole({x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE});
-    this.createBlackHole({x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE});
+    this.setRandomPosForBlackHoles();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
@@ -234,11 +232,8 @@ export class MainScene extends Phaser.Scene {
       {x: 760 * s, y: 490 * s, active: false},
       {x: 360 * s, y: 410 * s, active: false}
     ];
-
-    this.createBlackHole({x: 500 * s, y: 850 * s});
-    this.createBlackHole({x: 550 * s, y: 450 * s});
-    this.createBlackHole({x: 1300 * s, y: 850 * s});
   }
+
   update(time, delta) {
     if (this.character) {
       this.character.update(time, delta);
@@ -519,7 +514,7 @@ export class MainScene extends Phaser.Scene {
     this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
     this.animHole.setScale(0.5);
 
-    this.blackHoleZone = this.add.zone(this.animHole.x - 35 * WORLD_SCALE, this.animHole.y - 15 * WORLD_SCALE, 80 * WORLD_SCALE, 50 * WORLD_SCALE);
+    this.blackHoleZone = this.add.zone(this.animHole.x - 15 * WORLD_SCALE, this.animHole.y - 15 * WORLD_SCALE, 80 * WORLD_SCALE, 50 * WORLD_SCALE);
     this.physics.add.existing(this.blackHoleZone);
 
     this.blackHoleZone.body.setAllowGravity(false);
@@ -561,6 +556,23 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  setRandomPosForBlackHoles(){
+    const freePositionsBottom = [{x: 1750 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE}];
+    const freePositionsTop = [{x: 1200 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1700 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1400 * WORLD_SCALE, y: 490 * WORLD_SCALE}, {x: 1000 * WORLD_SCALE, y: 560 * WORLD_SCALE}, {x: 1800 * WORLD_SCALE, y: 100 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 190 * WORLD_SCALE}, {x: 850 * WORLD_SCALE, y: 350 * WORLD_SCALE}, {x: 580 * WORLD_SCALE, y: 450 * WORLD_SCALE}];
+    
+    const posBottom = Phaser.Utils.Array.GetRandom(freePositionsBottom);
+    this.createBlackHole({x: posBottom.x, y: posBottom.y});
+
+    const shuffled = Phaser.Utils.Array.Shuffle([...freePositionsTop]);
+    const pos1 = shuffled[0];
+    const pos2 = shuffled[1];
+    const pos3 = shuffled[2];
+
+    this.createBlackHole({x: pos1.x, y: pos1.y});
+    this.createBlackHole({x: pos2.x, y: pos2.y});
+    this.createBlackHole({x: pos3.x, y: pos3.y});
+  }
+
   generateHearts(delayedTime = 0) {
     this.time.delayedCall(delayedTime, () => {
         if(this.hearts >= this.heartsConstNumber) {
@@ -589,6 +601,16 @@ export class MainScene extends Phaser.Scene {
         heart.posRef = pos;
         
         this.addPhysicForNewHeart(heart);
+
+        heart.pulseTween = this.tweens.add({
+          targets: heart,
+          scaleX: 0.28,
+          scaleY: 0.28,
+          duration: 300,
+          ease: 'Sine.inOut',
+          yoyo: true,
+          repeat: -1 // бесконечно
+        });
     }
   }
 
@@ -615,34 +637,43 @@ export class MainScene extends Phaser.Scene {
   
     console.log(heart)
     this.heartTouched = true;
-    console.log("heartTouced");
+    console.log("heartTouched");
     
     // восстанавливаем hp
     const curHp = this.character.getHp();
     const maxHp = this.character.getMaxHp();
     ((maxHp - curHp) >= this.heartHealing) ? this.character.setHp(curHp + this.heartHealing) : this.character.setHp(maxHp);
+    
+    this.tweens.add({
+      targets: this.character,
+      scaleX: 1.5,
+      scaleY: 1.7,
+      duration: 150,
+      ease: 'Cubic.in',
+      yoyo: true
+    });
+
+    if (heartZone.overlapRef) {
+        heartZone.overlapRef.destroy();
+        heartZone.overlapRef = null;
+    }
+    if (heartZone.body) {
+        heartZone.body.destroy();
+    }
+    heartZone.heart = null;
+    heartZone.destroy();
 
     this.tweens.add({
       targets: heart,
       alpha: 0,
-      duration: 1200,
+      duration: 300,
       onComplete: () => {
         this.hearts--;
         if (heart) {
           heart.posRef.active = false;
+          if (heart.pulseTween) heart.pulseTween.stop();
           heart.destroy();
-          heartZone.heart = null;
         }
-        if (heartZone.overlapRef) {
-          heartZone.overlapRef.destroy();
-          heartZone.overlapRef = null;
-        }
-
-        if (heartZone.body) {
-          heartZone.body.destroy();
-        }
-
-        heartZone.destroy();
         this.heartTouched = false;
       }
     });
