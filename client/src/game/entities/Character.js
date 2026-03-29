@@ -1,3 +1,5 @@
+// File: client/src/game/entities/Character.js
+
 import { InputManager } from "../managers/InputManager";
 import { HealthIndicator } from "./HealthIndicator.js";
 import { DamagePopup } from "./DamagePopup.js";
@@ -23,7 +25,9 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitbox.body.setCollideWorldBounds(true);
     this.hitbox.body.setBounce(0, 0);
     this.hitbox.body.setDragX(1600);
-    this.hitbox.body.setMaxVelocity(600, 1200);
+
+    // ВАЖНО: Увеличиваем макс. скорость, чтобы она не мешала дэшу (1600+)
+    this.hitbox.body.setMaxVelocity(2000, 2000);
     this.hitbox.body.setSize(this.hitbox.width, this.hitbox.height);
     this.hitbox.body.setOffset(0, 0);
 
@@ -33,11 +37,11 @@ export class Character extends Phaser.GameObjects.Container {
     this.maxJumps = 2;
     this.jumpCount = 0;
 
-    // --- ПАРАМЕТРЫ ДЭША (DASH) ---
-    this.dashSpeed = 1600;         // Скорость рывка
-    this.dashDurationMs = 150;     // Длительность рывка
-    this.dashCooldownMs = 1500;    // Перезарядка
-    this.dashWindowMs = 150;       // Окно двойного клика
+    // --- ПАРАМЕТРЫ ДЭША ---
+    this.dashSpeed = 1800;         // Сделаем чуть быстрее для сочности
+    this.dashDurationMs = 180;     // Длительность рывка
+    this.dashCooldownMs = 1000;    // Перезарядка 1 сек
+    this.dashWindowMs = 250;       // Время для двойного клика
 
     this.dashState = {
       isDashing: false,
@@ -94,7 +98,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.anim.setMix('fly', 'jump', 0.25);
     this.add(this.anim);
 
-    if (this.showStats) {
+    if (options.showStats !== false) {
       this.healthIndicator = new HealthIndicator(scene, 0, -250, {nickname: this.nickname, textOffsetY: 0, barOffsetY: 14, textColor: '#e2e8f0', textStroke: '#0f172a'});
       this.add(this.healthIndicator);
     }
@@ -110,26 +114,25 @@ export class Character extends Phaser.GameObjects.Container {
     const now = time;
     const dt = delta / 1000;
 
+    const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
+
     const leftPressed = this.controller.left;
     const rightPressed = this.controller.right;
     const jumpPressed = this.controller.jumpJustPressed;
     const attackPressed = this.controller.attackJustPressed;
 
-    const leftJustPressed = this.controller.leftJustPressed ?? (leftPressed && !this.controller.prevState?.left);
-    const rightJustPressed = this.controller.rightJustPressed ?? (rightPressed && !this.controller.prevState?.right);
-    const downJustPressed = this.controller.downJustPressed ?? (this.controller.down && !this.controller.prevState?.down);
+    const leftJust = this.controller.leftJustPressed;
+    const rightJust = this.controller.rightJustPressed;
+    const upJust = this.controller.upJustPressed;
+    const downJust = this.controller.downJustPressed;
 
-    // ИСПРАВЛЕНИЕ ОШИБКИ WEBPACK: скобки вокруг оператора ?? перед ||
-    const upJustPressed = (this.controller.upJustPressed ?? (this.controller.currentState?.up && !this.controller.prevState?.up)) || jumpPressed;
-
-    const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
     const movingHorizontally = leftPressed !== rightPressed;
 
-    // === 1. ЗАВЕРШЕНИЕ ДЭША ===
-    if (now > this.dashState.until && this.dashState.isDashing) {
+    // === 1. ОБРАБОТКА ЗАВЕРШЕНИЯ ДЭША ===
+    if (this.dashState.isDashing && now > this.dashState.until) {
       this.dashState.isDashing = false;
       this.hitbox.body.setAllowGravity(true);
-      this.hitbox.body.setMaxVelocity(600, 1200);
+      this.hitbox.body.setVelocity(0, 0); // Резкая остановка после дэша
       this.anim.timeScale = 1.0;
     }
 
@@ -137,19 +140,23 @@ export class Character extends Phaser.GameObjects.Container {
     if (!this.dashState.isDashing && now > this.dashState.cooldownUntil) {
       let dX = 0, dY = 0;
 
-      if (leftJustPressed)   { if (now - this.lastTaps.left <= this.dashWindowMs) dX = -1; this.lastTaps.left = now; }
-      if (rightJustPressed)  { if (now - this.lastTaps.right <= this.dashWindowMs) dX = 1;  this.lastTaps.right = now; }
-      if (upJustPressed)     { if (now - this.lastTaps.up <= this.dashWindowMs) dY = -1;   this.lastTaps.up = now; }
-      if (downJustPressed)   { if (now - this.lastTaps.down <= this.dashWindowMs) dY = 1;   this.lastTaps.down = now; }
+      if (leftJust)  { if (now - this.lastTaps.left < this.dashWindowMs) dX = -1; this.lastTaps.left = now; }
+      if (rightJust) { if (now - this.lastTaps.right < this.dashWindowMs) dX = 1; this.lastTaps.right = now; }
+      if (upJust)    { if (now - this.lastTaps.up < this.dashWindowMs) dY = -1; this.lastTaps.up = now; }
+      if (downJust)  { if (now - this.lastTaps.down < this.dashWindowMs) dY = 1; this.lastTaps.down = now; }
 
       if (dX !== 0 || dY !== 0) {
         this.startDash(dX, dY, now);
       }
     }
 
-    // === 3. ДВИЖЕНИЕ ===
+    // === 3. ЛОГИКА ДВИЖЕНИЯ ИЛИ ДЭША ===
     if (this.dashState.isDashing) {
-      this.hitbox.body.setVelocity(this.dashState.dirX * this.dashSpeed, this.dashState.dirY * this.dashSpeed);
+      // Во время дэша просто летим по вектору
+      this.hitbox.body.setVelocity(
+          this.dashState.dirX * this.dashSpeed,
+          this.dashState.dirY * this.dashSpeed
+      );
       this.createDashTrail();
     } else {
       if (now - this.wallSlideState.lastActiveTime > 100) {
@@ -161,6 +168,7 @@ export class Character extends Phaser.GameObjects.Container {
         this.wallSlideState.isActive = false;
       }
 
+      // Прыжок
       if (jumpPressed) {
         if (this.wallSlideState.isActive && !isGrounded) {
           const jumpDir = -this.wallSlideState.direction;
@@ -176,14 +184,8 @@ export class Character extends Phaser.GameObjects.Container {
         }
       }
 
-      if (this.wallSlideState.isActive && !isGrounded) {
-        if (this.hitbox.body.velocity.y > this.wallSlideMaxSpeed) {
-          this.hitbox.body.setVelocityY(this.wallSlideMaxSpeed);
-        }
-      }
-
+      // Горизонтальное движение
       const isWallJumping = !isGrounded && Math.abs(this.hitbox.body.velocity.x) > this.moveSpeed;
-
       if (!isWallJumping) {
         if (leftPressed && !rightPressed) {
           this.hitbox.body.setVelocityX(-this.moveSpeed);
@@ -196,11 +198,16 @@ export class Character extends Phaser.GameObjects.Container {
         }
       }
 
-      // СПРЫГИВАНИЕ ВНИЗ: Одинарное нажатие
-      if (downJustPressed && isGrounded && this.isStandingOnDropThroughPlatform()) {
+      // Стены
+      if (this.wallSlideState.isActive && !isGrounded && this.hitbox.body.velocity.y > this.wallSlideMaxSpeed) {
+        this.hitbox.body.setVelocityY(this.wallSlideMaxSpeed);
+      }
+
+      // Спрыгивание
+      if (downJust && isGrounded && this.isStandingOnDropThroughPlatform()) {
         this.dropThroughUntil = now + this.dropThroughDurationMs;
-        this.hitbox.y += 300 * dt;
-        this.hitbox.body.setVelocityY(200);
+        this.hitbox.y += 10;
+        this.hitbox.body.setVelocityY(200); // Немного толкаем вниз для уверенного прохода сквозь платформу
       }
     }
 
@@ -225,18 +232,20 @@ export class Character extends Phaser.GameObjects.Container {
       }
     }
 
+    // Цвет игрока
     if (this.currentTint !== undefined) {
       this.applySlotColor('body', this.currentTint);
     }
 
+    // Полоска дэша
     if (this.showStats && this.healthIndicator && this.healthIndicator.updateDash) {
-      let dashRatio = 1;
-      if (now < this.dashState.cooldownUntil) {
-        dashRatio = 1 - ((this.dashState.cooldownUntil - now) / this.dashCooldownMs);
-      }
-      this.healthIndicator.updateDash(dashRatio);
+      const ratio = (this.dashState.cooldownUntil > now)
+          ? 1 - ((this.dashState.cooldownUntil - now) / this.dashCooldownMs)
+          : 1;
+      this.healthIndicator.updateDash(ratio);
     }
 
+    // Синхронизация хитбоксов и UI
     this.syncContainerToHitbox();
   }
 
@@ -261,31 +270,18 @@ export class Character extends Phaser.GameObjects.Container {
     this.playJumpSound();
 
     if (unit_manager.socket) {
-      unit_manager.socket.emit('playerAction', { action: 'dash', dirX, dirY });
+      unit_manager.socket.emit('playerAction', { action: 'dash', dirX: this.dashState.dirX, dirY: this.dashState.dirY });
     }
   }
 
   createDashTrail() {
-    if (this.scene.time.now % 2 !== 0) return;
-
-    const trail = this.scene.add.rectangle(
-        this.hitbox.x,
-        this.hitbox.y,
-        this.hitbox.width,
-        this.hitbox.height,
-        0x0ea5e9,
-        0.5
-    );
-    trail.setOrigin(0.5);
-    trail.setDepth(this.depth - 1);
-
+    if (this.scene.time.now % 4 !== 0) return;
+    const trail = this.scene.add.rectangle(this.hitbox.x, this.hitbox.y, 80, 120, 0x0ea5e9, 0.4);
     this.scene.tweens.add({
       targets: trail,
       alpha: 0,
-      scaleX: 0.2,
-      scaleY: 0.2,
-      duration: 300,
-      ease: 'Sine.out',
+      scale: 0.5,
+      duration: 250,
       onComplete: () => trail.destroy()
     });
   }
@@ -402,14 +398,14 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   playKickSound() {
-    const kickSoundKeys = ['kick', 'kick1'];
+    const kickSoundKeys =['kick', 'kick1'];
     if (this.scene.sound.locked) return;
     const key = Phaser.Utils.Array.GetRandom(kickSoundKeys);
     this.scene.sound.play(key, { volume: 0.2 });
   }
 
   playDamageSound() {
-    const damageSoundKeys = ['damage', 'damage1', 'damage2', 'damage3'];
+    const damageSoundKeys =['damage', 'damage1', 'damage2', 'damage3'];
     if (this.scene.sound.locked) return;
     const key = Phaser.Utils.Array.GetRandom(damageSoundKeys);
     this.scene.sound.play(key, { volume: 0.2 });
