@@ -411,15 +411,31 @@ export class Character extends Phaser.GameObjects.Container {
     this.scene.sound.play(key, { volume: 0.2 });
   }
 
-  applyRemoteState(x, y, now = this.scene ? this.scene.time.now : 0) { // [FIX] Безопасный дефолтный аргумент
-    const movedX = x - this.x;
-    const movedY = y - this.y;
-    const isMoving = Math.abs(movedX) > 1;
-    this.setPosition(x, y);
+  applyRemoteState(targetX, targetY, now = this.scene ? this.scene.time.now : 0) {
+    const dist = Phaser.Math.Distance.Between(this.x, this.y, targetX, targetY);
+
+    let nextX = targetX;
+    let nextY = targetY;
+
+    //[FIX] Если дистанция огромная (телепорт черной дырой или спавн) - прыгаем мгновенно!
+    if (dist > 300) {
+      this.setPosition(targetX, targetY);
+    } else {
+      // [FIX] Иначе плавно скользим (Lerp) к цели. Это превращает дерганые пакеты сервера в плавные 60 FPS
+      const lerpFactor = 0.25;
+      nextX = Phaser.Math.Linear(this.x, targetX, lerpFactor);
+      nextY = Phaser.Math.Linear(this.y, targetY, lerpFactor);
+      this.setPosition(nextX, nextY);
+    }
+
+    const movedX = targetX - this.x;
+    const movedY = targetY - this.y;
+    const isMoving = Math.abs(movedX) > 2;
+
     if (movedX !== 0) this.applyFacingDirection(movedX < 0 ? -1 : 1);
 
     if (!this.isAttacking() && !this.isHit() && !this.dashState.isDashing) {
-      if (Math.abs(movedY) > 1) {
+      if (Math.abs(movedY) > 5) {
         this.setAnimation(movedY < 0 ? 'jump' : 'fly');
       } else {
         this.setAnimation(isMoving ? 'run' : 'idle', true);

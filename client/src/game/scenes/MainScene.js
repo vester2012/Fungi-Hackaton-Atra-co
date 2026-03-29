@@ -17,7 +17,7 @@ export class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
     this.createdMinas = false;
-    this.lastNetworkSync = 0; // [FIX] Таймер для ограничения спама пакетами
+    this.lastNetworkSync = 0;
   }
 
   create() {
@@ -34,7 +34,7 @@ export class MainScene extends Phaser.Scene {
     this.bombaDemage = 0.5;
     this.bombasCount = 0;
 
-    this.enemySpawns = [];
+    this.enemySpawns =[];
     this.positionsForHeart =[];
     this.spawnPoint = { x: 220 * WORLD_SCALE, y: 650 * WORLD_SCALE };
 
@@ -92,31 +92,37 @@ export class MainScene extends Phaser.Scene {
     backButton.on('pointerover', () => backButton.setFillStyle(0xfbbf24, 1))
         .on('pointerout', () => backButton.setFillStyle(0xf59e0b, 1))
         .on('pointerdown', () => {
-          this.handleCharacterDeath(); // Используем этот же метод для чистого выхода
+          // [FIX] Передаем true, чтобы выйти даже если персонаж жив
+          this.handleCharacterDeath(true);
         });
 
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
-    //this.createDebugZoomControls(viewWidth);
 
-    // [FIX] Подключаем критические слушатели для удаления призраков и синхронизации
     this.setupSocketListeners();
   }
 
-  // [FIX] Настройка слушателей сокетов прямо в сцене
   setupSocketListeners() {
     if (!unit_manager.socket) return;
+
+    // [FIX] Убираем старые слушатели, чтобы не было дубликатов при перезаходах
+    unit_manager.socket.off('playerDisconnected');
+    unit_manager.socket.off('currentPlayers');
+    unit_manager.socket.off('newPlayer');
+    unit_manager.socket.off('newPlayer_queue');
+    unit_manager.socket.off('playerMoved');
+    unit_manager.socket.off('enemiesState');
 
     // Кто-то вышел
     unit_manager.socket.on('playerDisconnected', (id) => {
       const p = unit_manager.info.players[id];
       if (p && p.obj) {
-        p.obj.destroy(); // Уничтожаем физический спрайт (УБИРАЕТ ПРИЗРАКОВ)
+        p.obj.destroy();
       }
       delete unit_manager.info.players[id];
     });
 
-    // Массив всех игроков (приходит при подключении)
+    // Массив всех игроков
     unit_manager.socket.on('currentPlayers', (players) => {
       for (const [id, data] of Object.entries(players)) {
         if (id === unit_manager.my_id) continue;
@@ -126,8 +132,15 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    // Новый игрок
+    // Новый игрок (обычная комната)
     unit_manager.socket.on('newPlayer', (player) => {
+      if (player.id !== unit_manager.my_id) {
+        unit_manager.info.players[player.id] = player;
+      }
+    });
+
+    // [FIX] Новый игрок (матчмейкинг)
+    unit_manager.socket.on('newPlayer_queue', (player) => {
       if (player.id !== unit_manager.my_id) {
         unit_manager.info.players[player.id] = player;
       }
@@ -135,7 +148,13 @@ export class MainScene extends Phaser.Scene {
 
     // Движение других
     unit_manager.socket.on('playerMoved', (player) => {
-      if (player.id !== unit_manager.my_id && unit_manager.info.players[player.id]) {
+      if (player.id === unit_manager.my_id) return;
+
+      // [FIX] Защита от потери пакета входа (currentPlayers/newPlayer).
+      // Если мы получаем координаты игрока, которого у нас еще нет - сразу создаем его!
+      if (!unit_manager.info.players[player.id]) {
+        unit_manager.info.players[player.id] = player;
+      } else {
         unit_manager.info.players[player.id].x = player.x;
         unit_manager.info.players[player.id].y = player.y;
         unit_manager.info.players[player.id].hp = player.hp;
@@ -289,7 +308,6 @@ export class MainScene extends Phaser.Scene {
       playerState.hp = this.character.getHp();
       unit_manager.info.players[unit_manager.my_id] = playerState;
 
-      // [FIX] Спасаем сервер от DDoS! Ограничиваем рассылку до 20 FPS (каждые 50 мс)
       if (time - this.lastNetworkSync > 50) {
         this.lastNetworkSync = time;
         if (unit_manager.socket) {
@@ -303,20 +321,25 @@ export class MainScene extends Phaser.Scene {
       this.parallax.update(this.cameras.main);
     }
 
-    this.handleCharacterDeath();
+    this.handleCharacterDeath(); // Вызов без параметров (смерть)
     this.updateEnemiesBot(time, delta);
     this.enemyManager?.update(time, delta, this.character);
     this.updateEnemysPlayers(time, delta);
     this.updateHud(time, delta);
-    this.updateSocketInfo(time, delta);
   }
 
   updateEnemysPlayers(time, delta) {
     let players = unit_manager.info.players;
     for (const [id, data] of Object.entries(players)) {
       if (id !== unit_manager.my_id) {
-        // [FIX] Добавлена проверка !data.obj.scene
-        // Если объект остался от прошлой сессии и был уничтожен, мы создадим его заново
+
+        if (data.hp <= 0 && data.obj) {
+          data.obj.destroy();
+          data.obj = null;
+          continue;
+        }
+        if (data.hp <= 0) continue;
+
         if (!data.obj || !data.obj.scene) {
           data.obj = this.createEnemy();
           if (data.username) data.obj.healthIndicator.setNickname(data.username);
@@ -340,16 +363,6 @@ export class MainScene extends Phaser.Scene {
         }
       }
     }
-  }
-
-
-  updateSocketInfo() {
-    let players = unit_manager.info.players;
-    let str = '';
-    for (const[key, value] of Object.entries(players)) {
-      str += `id:${players[key].id}   hp:${players[key].hp} (${players[key].x}:${players[key].y})` + '\n'
-    }
-    if (unit_manager.textRoomInfo) unit_manager.textRoomInfo.setText("info socket:" + "\n" + str)
   }
 
   checkCollision(rect1, rect2) {
@@ -421,14 +434,19 @@ export class MainScene extends Phaser.Scene {
     this.enemyManager?.handlePlayerAttack(playerAttackBounds, attackId, this.character.getAttackDamage());
   }
 
-  handleCharacterDeath() {
-    if (!this.character || this.isReturningToMenu || !this.character.isDead()) return;
+  // [FIX] Добавлен флаг `force`, который заставляет выйти в меню даже если ХП не на нуле
+  handleCharacterDeath(force = false) {
+    if (!this.character || this.isReturningToMenu) return;
+
+    // Если игрок жив и мы не нажимали кнопку принудительного выхода - ничего не делаем
+    if (!force && !this.character.isDead()) return;
 
     this.isReturningToMenu = true;
     if (unit_manager.socket) {
       unit_manager.socket.off('playerDisconnected');
       unit_manager.socket.off('currentPlayers');
       unit_manager.socket.off('newPlayer');
+      unit_manager.socket.off('newPlayer_queue');
       unit_manager.socket.off('playerMoved');
       unit_manager.socket.off('enemiesState');
       unit_manager.socket.emit('playerDied');
@@ -436,20 +454,19 @@ export class MainScene extends Phaser.Scene {
 
     this.cameras.main.stopFollow();
 
-    if (unit_manager.info.players[unit_manager.my_id]) {
-      unit_manager.info.players[unit_manager.my_id].obj = null;
-    }
-
     this.character.destroy();
     this.character = null;
 
-    // [FIX] Очищаем ссылки на объекты после их уничтожения!
+    // Уничтожаем все чужие спрайты перед выходом
     for (const [id, data] of Object.entries(unit_manager.info.players)) {
       if (data.obj) {
         data.obj.destroy();
-        data.obj = null; // <--- Вот этой строки не хватало!
       }
     }
+
+    // ЖЕСТКАЯ ОЧИСТКА КЭША
+    unit_manager.info.players = {};
+    unit_manager.info.enemies = {};
 
     this.scene.start('MenuScene');
   }
@@ -477,34 +494,6 @@ export class MainScene extends Phaser.Scene {
     if (this.character) {
       this.character.syncHpText();
     }
-  }
-
-  createDebugZoomControls(viewWidth) {
-    unit_manager.textRoomInfo = this.add.text(200, 42, 'Zoom', {
-      fontFamily: 'JungleAdventurer',
-      fontSize: '20px',
-      color: '#e2e8f0'
-    }).setScrollFactor(0);
-
-    const zoomLabel = this.add.text(viewWidth - 210, 42, 'Zoom', {
-      fontFamily: 'JungleAdventurer',
-      fontSize: '20px',
-      color: '#e2e8f0'
-    }).setScrollFactor(0);
-
-    const zoomOutButton = this.createDebugButton(viewWidth - 240, 86, '-', () => {
-      const nextZoom = Phaser.Math.Clamp(this.cameras.main.zoom - 0.1, 0.4, 2.5);
-      this.cameras.main.setZoom(nextZoom);
-    });
-
-    const zoomInButton = this.createDebugButton(viewWidth - 120, 86, '+', () => {
-      const nextZoom = Phaser.Math.Clamp(this.cameras.main.zoom + 0.1, 0.4, 2.5);
-      this.cameras.main.setZoom(nextZoom);
-    });
-
-    zoomLabel.setDepth(10);
-    zoomOutButton.label.setDepth(11);
-    zoomInButton.label.setDepth(11);
   }
 
   createDebugButton(x, y, label, onClick) {
