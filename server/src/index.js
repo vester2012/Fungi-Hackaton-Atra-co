@@ -161,6 +161,7 @@ io.on('connection', (socket) => {
 
 
       socket.join(queue.idRoom);
+      joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
 
       let list_rooms = rooms.map(obj => obj.info);
       socket.emit('update_list_rooms', { list_rooms });
@@ -170,10 +171,12 @@ io.on('connection', (socket) => {
       queue.players.push(sid);
 
       // // ВАЖНО: Присоединяем текущий сокет к комнате
-      // socket.join(queue.idRoom);
+
 
       // Вызываем вашу функцию логики (если она делает socket.join внутри, убедитесь в этом)
       joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
+
+      socket.join(queue.idRoom);
 
       if (queue.remainLots === 0) {
         queue.isStarted = true;
@@ -181,11 +184,12 @@ io.on('connection', (socket) => {
         // ИСПРАВЛЕНИЕ: Отправляем ВСЕМ в этой комнате
         // Используйте io.to(...), а не socket.emit(...)
 
-        getPlayersAndEnemiesByRoom(io, '_queue', rooms.find(room => room.info.id === queue.idRoom))
+        //io.to(queue.idRoom).emit('currentPlayers', {huy:1});
         io.to(queue.idRoom).emit('mm_is_already', {
           idRoom: queue.idRoom,
           passRoom: queue.passRoom
         });
+        getPlayersAndEnemiesByRoom(io, '_queue', rooms.find(room => room.info.id === queue.idRoom))
 
         arrQueue = arrQueue.filter(el => el.idRoom !== queue.idRoom);
       }
@@ -288,9 +292,8 @@ function getPlayersAndEnemiesByRoom(io, prefix, room) {
       console.log();
     if (p.roomId == room.info.id) playersInRoom[p.id] = p;
   });
-
-  io.to(room.info.id).emit('currentPlayers' + prefix, playersInRoom);
-  io.to(room.info.id).emit('currentEnemies' + prefix, room.enemies);
+  io.to(room.info.id).emit('currentPlayers', playersInRoom);
+  io.to(room.info.id).emit('currentEnemies', room.enemies);
   return playersInRoom;
 }
 function createRoom(arg) {

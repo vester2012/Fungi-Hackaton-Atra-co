@@ -268,7 +268,7 @@ export class MainScene extends Phaser.Scene {
     this.enemyManager?.update(time, delta, this.character);
     this.updateEnemysPlayers(time, delta);
     this.updateHud(time, delta);
-    //this.updateSocketInfo(time, delta);
+    this.updateSocketInfo(time, delta);
   }
 
   updateEnemysPlayers(time, delta) {
@@ -306,12 +306,7 @@ export class MainScene extends Phaser.Scene {
     for (const [key, value] of Object.entries(players)) {
       str += `id:${players[key].id}   hp:${players[key].hp} (${players[key].x}:${players[key].y})` + '\n'
     }
-
-    if (this.textInfo) {
-      this.textInfo.setText("info socket:" + "\n" + str);
-    } else {
-      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
-    }
+      unit_manager.textRoomInfo?.setText("info socket:" + "\n" + str)
   }
 
   checkCollision(rect1, rect2) {
@@ -433,6 +428,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   createDebugZoomControls(viewWidth) {
+
+    unit_manager.textRoomInfo = this.add.text(200, 42, 'Zoom', {
+      fontFamily: 'JungleAdventurer',
+      fontSize: '20px',
+      color: '#e2e8f0'
+    }).setScrollFactor(0);
+
     const zoomLabel = this.add.text(viewWidth - 210, 42, 'Zoom', {
       fontFamily: 'JungleAdventurer',
       fontSize: '20px',
@@ -521,7 +523,7 @@ export class MainScene extends Phaser.Scene {
   setRandomPosForBlackHoles(){
     const freePositionsBottom = [{x: 1750 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE}];
     const freePositionsTop = [{x: 1200 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1700 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1400 * WORLD_SCALE, y: 490 * WORLD_SCALE}, {x: 1000 * WORLD_SCALE, y: 560 * WORLD_SCALE}, {x: 1800 * WORLD_SCALE, y: 100 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 190 * WORLD_SCALE}, {x: 850 * WORLD_SCALE, y: 350 * WORLD_SCALE}, {x: 580 * WORLD_SCALE, y: 450 * WORLD_SCALE}];
-    
+
     const posBottom = Phaser.Utils.Array.GetRandom(freePositionsBottom);
     this.createBlackHole({x: posBottom.x, y: posBottom.y});
 
@@ -554,6 +556,7 @@ export class MainScene extends Phaser.Scene {
     let heart;
     const freePositions = this.positionsForHeart.filter(p => !p.active);
     if (freePositions.length > 0) {
+
       const pos = Phaser.Utils.Array.GetRandom(freePositions);
       pos.active = true;
       heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
@@ -594,15 +597,17 @@ export class MainScene extends Phaser.Scene {
 
   onHeartTouch(heart, heartZone){
     if (this.heartTouched) return;
-  
+
+    console.log(heart)
+
     this.heartTouched = true;
     console.log("heartTouched");
-    
+
     // восстанавливаем hp
     const curHp = this.character.getHp();
     const maxHp = this.character.getMaxHp();
     ((maxHp - curHp) >= this.heartHealing) ? this.character.setHp(curHp + this.heartHealing) : this.character.setHp(maxHp);
-    
+
     this.tweens.add({
       targets: this.character,
       scaleX: 1.5,
