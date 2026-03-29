@@ -14,6 +14,8 @@ export class MenuScene extends Phaser.Scene {
     this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas')
 
     this.load.image('heart', '/assets/heart.png');
+    this.load.image('mina', '/assets/mina.png');
+    this.load.image('bomba', '/assets/bomba.png');
 
     this.load.audio('jump', ['/assets/audio/ma-jump.mp3', '/assets/audio/ma-jump.ogg']);
     this.load.audio('jump1', ['/assets/audio/ma-jump1.mp3', '/assets/audio/ma-jump1.ogg']);
