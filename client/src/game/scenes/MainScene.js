@@ -310,10 +310,15 @@ export class MainScene extends Phaser.Scene {
   }
 
   checkCollision(rect1, rect2) {
-    return rect1.x < rect2.x + rect2.w &&
-        rect1.x + rect1.w > rect2.x &&
-        rect1.y < rect2.y + rect2.h &&
-        rect1.y + rect1.h > rect2.y;
+    const rect1Width = rect1.w ?? rect1.width;
+    const rect1Height = rect1.h ?? rect1.height;
+    const rect2Width = rect2.w ?? rect2.width;
+    const rect2Height = rect2.h ?? rect2.height;
+
+    return rect1.x < rect2.x + rect2Width &&
+        rect1.x + rect1Width > rect2.x &&
+        rect1.y < rect2.y + rect2Height &&
+        rect1.y + rect1Height > rect2.y;
   }
 
   getCollisionAttack() {
@@ -323,12 +328,7 @@ export class MainScene extends Phaser.Scene {
     const attackRect = this.character.getAttackHitbox().getBounds();
 
     otherPlayers.forEach((player) => {
-      const enemyHitbox = {
-        x: player.obj.hitbox.x,
-        y: player.obj.hitbox.y,
-        w: player.obj.hitbox.width,
-        h: player.obj.hitbox.height
-      };
+      const enemyHitbox = player.obj.hitbox.getBounds();
 
       if (this.checkCollision(attackRect, enemyHitbox)) {
         unit_manager.socket.emit('playerHit', {
