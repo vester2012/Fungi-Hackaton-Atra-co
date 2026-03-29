@@ -105,65 +105,97 @@ export class MainScene extends Phaser.Scene {
   setupSocketListeners() {
     if (!unit_manager.socket) return;
 
-    // [FIX] Убираем старые слушатели, чтобы не было дубликатов при перезаходах
-    unit_manager.socket.off('playerDisconnected');
-    unit_manager.socket.off('currentPlayers');
-    unit_manager.socket.off('newPlayer');
-    unit_manager.socket.off('newPlayer_queue');
-    unit_manager.socket.off('playerMoved');
-    unit_manager.socket.off('enemiesState');
+    // Очистка старых слушателей
+    const events = [
+      'playerDisconnected', 'currentPlayers', 'newPlayer', 'newPlayer_queue',
+      'playerMoved', 'enemiesState', 'playerAttacked', 'playerActionReceive',
+      'hpUpdate', 'enemyHpUpdate', 'enemyDied', 'enemyRespawned'
+    ];
+    events.forEach(e => unit_manager.socket.off(e));
 
-    // Кто-то вышел
+    // КТО-ТО ВЫШЕЛ
     unit_manager.socket.on('playerDisconnected', (id) => {
       const p = unit_manager.info.players[id];
-      if (p && p.obj) {
-        p.obj.destroy();
-      }
+      if (p && p.obj) p.obj.destroy();
       delete unit_manager.info.players[id];
     });
 
-    // Массив всех игроков
+    // СПИСОК ИГРОКОВ ПРИ ВХОДЕ
     unit_manager.socket.on('currentPlayers', (players) => {
       for (const [id, data] of Object.entries(players)) {
         if (id === unit_manager.my_id) continue;
-        if (!unit_manager.info.players[id]) {
-          unit_manager.info.players[id] = data;
+        unit_manager.info.players[id] = data;
+      }
+    });
+
+    // НОВЫЙ ИГРОК
+    const onNewPlayer = (player) => {
+      if (player.id !== unit_manager.my_id) {
+        unit_manager.info.players[player.id] = player;
+      }
+    };
+    unit_manager.socket.on('newPlayer', onNewPlayer);
+    unit_manager.socket.on('newPlayer_queue', onNewPlayer);
+
+    // ДВИЖЕНИЕ
+    unit_manager.socket.on('playerMoved', (player) => {
+      if (player.id === unit_manager.my_id) return;
+      if (!unit_manager.info.players[player.id]) {
+        unit_manager.info.players[player.id] = player;
+      } else {
+        Object.assign(unit_manager.info.players[player.id], { x: player.x, y: player.y, hp: player.hp });
+      }
+    });
+
+    // [FIX] АНИМАЦИЯ АТАКИ ДРУГИХ ИГРОКОВ
+    unit_manager.socket.on('playerAttacked', (data) => {
+      const p = unit_manager.info.players[data.attackerId];
+      if (p) p.pendingAttackId = data.attackId;
+    });
+
+    // [FIX] УРОН ПО ИГРОКАМ (ВКЛЮЧАЯ СЕБЯ)
+    unit_manager.socket.on('hpUpdate', (data) => {
+      // Если это я
+      if (data.id === unit_manager.my_id && this.character) {
+        this.character.applySyncedDamage(data.damage, data.hp);
+      }
+      // Если это другой игрок
+      else if (unit_manager.info.players[data.id]) {
+        const pData = unit_manager.info.players[data.id];
+        pData.hp = data.hp;
+        if (pData.obj) {
+          pData.obj.applySyncedDamage(data.damage, data.hp);
         }
       }
     });
 
-    // Новый игрок (обычная комната)
-    unit_manager.socket.on('newPlayer', (player) => {
-      if (player.id !== unit_manager.my_id) {
-        unit_manager.info.players[player.id] = player;
+    // [FIX] УРОН ПО ВРАГАМ
+    unit_manager.socket.on('enemyHpUpdate', (data) => {
+      const enemyState = unit_manager.info.enemies[data.id];
+      if (enemyState) {
+        enemyState.hp = data.hp;
+        if (enemyState.obj) enemyState.obj.setHp(data.hp);
       }
     });
 
-    // [FIX] Новый игрок (матчмейкинг)
-    unit_manager.socket.on('newPlayer_queue', (player) => {
-      if (player.id !== unit_manager.my_id) {
-        unit_manager.info.players[player.id] = player;
-      }
+    // СМЕРТЬ И РЕСПАУН ВРАГОВ
+    unit_manager.socket.on('enemyDied', (data) => {
+      const enemy = unit_manager.info.enemies[data.id];
+      if (enemy) enemy.alive = false;
     });
 
-    // Движение других
-    unit_manager.socket.on('playerMoved', (player) => {
-      if (player.id === unit_manager.my_id) return;
-
-      // [FIX] Защита от потери пакета входа (currentPlayers/newPlayer).
-      // Если мы получаем координаты игрока, которого у нас еще нет - сразу создаем его!
-      if (!unit_manager.info.players[player.id]) {
-        unit_manager.info.players[player.id] = player;
-      } else {
-        unit_manager.info.players[player.id].x = player.x;
-        unit_manager.info.players[player.id].y = player.y;
-        unit_manager.info.players[player.id].hp = player.hp;
-      }
+    unit_manager.socket.on('enemyRespawned', (data) => {
+      unit_manager.info.enemies[data.id] = data;
     });
 
-    // Враги
-    unit_manager.socket.on('enemiesState', (enemies) => {
-      unit_manager.info.enemies = enemies;
+    // ДЕЙСТВИЯ (ДЭШ И Т.Д.)
+    unit_manager.socket.on('playerActionReceive', (data) => {
+      const p = unit_manager.info.players[data.playerId];
+      if (p) {
+        p.pendingAction = data.action;
+        p.actionDirX = data.dirX;
+        p.actionDirY = data.dirY;
+      }
     });
   }
 
