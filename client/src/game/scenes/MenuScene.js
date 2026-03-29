@@ -11,8 +11,7 @@ export class MenuScene extends Phaser.Scene {
     this.load.spine('blackhole_spine_SPO', '/assets/anim/blackhole_anim_spine.json', '/assets/anim/blackhole_anim_spine.atlas');
     this.load.spine('fish_SPO', '/assets/anim/fish.json', '/assets/anim/fish.atlas');
     this.load.spine('enemy_bee_SPO', '/assets/anim/enemy_bee.json', '/assets/anim/enemy_bee.atlas');
-    this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas');
-    this.load.spine('dust_SPO', '/assets/anim/dust.json', '/assets/anim/dust.atlas')
+    this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas')
 
     this.load.image('heart', '/assets/heart.png');
     this.load.image('mina', '/assets/mina.png');
@@ -31,7 +30,7 @@ export class MenuScene extends Phaser.Scene {
     for (let i = 1; i <= 7; i++) {
       this.load.image(`sky_layer_${i}`, `/assets/bg/bg_${i}.webp`);
     }
-    this.load.json('map_1', '/assets/level_map.json');
+    // this.load.json('map_1', '/assets/level_map.json');
   }
 
   create() {
@@ -150,10 +149,10 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     button.on('pointerover', () => {
-        button.setScale(1.03);
-      }).on('pointerout', () => {
-        button.setScale(1);
-      }).on('pointerdown', onClick);
+      button.setScale(1.03);
+    }).on('pointerout', () => {
+      button.setScale(1);
+    }).on('pointerdown', onClick);
 
     text.setDepth(1);
   }

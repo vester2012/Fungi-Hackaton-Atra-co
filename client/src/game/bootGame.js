@@ -1,4 +1,4 @@
-import { BootScene } from './scenes/BootScene.js';
+import { MenuScene } from './scenes/MenuScene.js';
 import { MainScene } from './scenes/MainScene.js';
 
 export function bootGame(parent) {
@@ -36,6 +36,6 @@ export function bootGame(parent) {
           ]
           : []
     },
-    scene: [BootScene, MainScene]
+    scene: [MenuScene, MainScene]
   });
 }
