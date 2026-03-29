@@ -78,7 +78,7 @@ export class MainScene extends Phaser.Scene {
     this.containerForBust = this.add.container(0, 0);
     this.setRandomPosForBlackHoles();
     this.generateHearts();
-    this.createMines();
+    // this.createMines();
     //this.createBombas();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
@@ -714,7 +714,7 @@ export class MainScene extends Phaser.Scene {
     
     minaZone.destroy();
      // взрыв ???
-    this.animMina = this.add.spine(mina.x, mina.y, 'dust_SPO', 'idle', false);
+    // this.animMina = this.add.spine(mina.x, mina.y, 'dust_SPO', 'idle', false);
     this.animMina.setScale(3);
     this.animMina.setDepth(9999);
     // прячем мину
