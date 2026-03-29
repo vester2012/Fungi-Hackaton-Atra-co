@@ -1,6 +1,4 @@
 import { Character } from '../entities/Character.js';
-import { Enemy } from '../entities/Enemy.js';
-import { SkeletonBombEnemy } from '../entities/SkeletonBombEnemy.js';
 import { Platform } from '../entities/Platform.js';
 import { EnemyManager } from '../managers/EnemyManager.js';
 import {unit_manager} from "../unit_manager";
@@ -73,9 +71,11 @@ export class MainScene extends Phaser.Scene {
     this.createCharacter();
 
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
-    this.createEnemiesBot();
-    this.enemiesBot.forEach(enemy => this.zoneManager.addInteractor(enemy.getPhysicsTarget()));
-    this.enemyManager = new EnemyManager(this, { targetFlyingCount: 2 });
+    this.enemyManager = new EnemyManager(this, {
+      walkingSpawns: this.enemySpawns,
+      targetWalkingCount: this.enemySpawns.length,
+      targetFlyingCount: 2
+    });
     this.createHud(viewWidth);
     this.createBlackHole({x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE});
     this.createBlackHole({x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE});
@@ -443,25 +443,6 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  createEnemiesBot() {
-    this.enemiesBot = this.enemySpawns.map((spawn) => {
-        const enemy = new SkeletonBombEnemy(this, spawn.x, spawn.y, { id: spawn.id });
-
-        if (!unit_manager.info.enemies[spawn.id]) {
-            unit_manager.info.enemies[spawn.id] = {};
-        }
-        unit_manager.info.enemies[spawn.id].obj = enemy;
-        unit_manager.info.enemies[spawn.id].id = spawn.id;
-
-        return enemy;
-    });
-
-    this.enemiesBot.forEach((enemy) => {
-      enemy.setDepth(2);
-      this.physics.add.collider(enemy.getPhysicsTarget(), this.platforms);
-    });
-  }
-
   updateEnemiesBot(time, delta) {
     if (!this.character) return;
 
@@ -469,37 +450,7 @@ export class MainScene extends Phaser.Scene {
     const isPlayerAttacking = this.character.isAttacking();
     const playerAttackBounds = isPlayerAttacking ? this.character.getAttackHitbox().getBounds() : null;
 
-    if (this.enemiesBot?.length) {
-      this.enemiesBot.forEach((enemy) => {
-        const enemyState = unit_manager.info.enemies[enemy.id];
-        if (typeof enemyState?.hp === 'number' && enemyState.hp !== enemy.getHp()) {
-          enemy.setHp(enemyState.hp);
-        }
-
-        enemy.update(time, delta, this.character);
-        if (enemy.isDead()) return;
-        if (!isPlayerAttacking || attackId === 0) return;
-
-        if (Phaser.Geom.Intersects.RectangleToRectangle(playerAttackBounds, enemy.getPhysicsTarget().getBounds())) {
-          const applied = enemy.takeDamage(this.character.getAttackDamage(), attackId);
-          if (applied) {
-            unit_manager.info.enemies[enemy.id] = { id: enemy.id, hp: enemy.getHp() };
-            unit_manager.socket.emit('enemyHit', { enemyId: enemy.id, damage: this.character.getAttackDamage() });
-          }
-        }
-      });
-    }
-
     this.enemyManager?.handlePlayerAttack(playerAttackBounds, attackId, this.character.getAttackDamage());
-
-    for (let i = (this.enemiesBot?.length ?? 0) - 1; i >= 0; i--) {
-      if (this.enemiesBot[i].isDead() && (!this.enemiesBot[i].isReadyToDestroy || this.enemiesBot[i].isReadyToDestroy(time))) {
-        const enemy = this.enemiesBot[i];
-        delete unit_manager.info.enemies[enemy.id];
-        enemy.destroy();
-        this.enemiesBot.splice(i, 1);
-      }
-    }
   }
 
   handleCharacterDeath() {
