@@ -3,10 +3,10 @@ import { Platform } from '../entities/Platform.js';
 import { EnemyManager } from '../managers/EnemyManager.js';
 import {unit_manager} from "../unit_manager";
 import {MobileUI} from "../ui/MobileUI";
-import {WallSlideZone} from "../systems/WallSlideZone";
 import {ZoneManager} from "../systems/ZoneManager";
 import {utils} from "../utils.js";
 import {ParallaxBackground} from "../systems/ParallaxBackground";
+import { buildSceneLevel } from '../level/buildLevel.js';
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
@@ -32,8 +32,9 @@ export class MainScene extends Phaser.Scene {
     this.bombasCount = 0;
 
     // Базовые массивы для данных из JSON
-    this.enemySpawns = [];
     this.positionsForHeart =[];
+    this.positionsForMines = [];
+    this.positionsForBombas = [];
     this.spawnPoint = { x: 220 * WORLD_SCALE, y: 650 * WORLD_SCALE }; // Точка по умолчанию
 
     // Пробуем получить карту из кэша (если она была загружена в MenuScene)
@@ -57,22 +58,16 @@ export class MainScene extends Phaser.Scene {
     this.parallax = new ParallaxBackground(this, 'sky_layer_', 8);
 
     // ПОСТРОЕНИЕ УРОВНЯ
-    if (levelData) {
-      this.buildLevelFromJson(levelData);
-    } else {
+    if (!levelData) {
       console.warn('level_map.json не найден! Загружена стандартная карта.');
-      this.buildFallbackLevel();
     }
+    buildSceneLevel(this, levelData, WORLD_SCALE);
 
     // Инициализация персонажа на точке спавна
     this.createCharacter();
 
     this.zoneManager.addInteractor(this.character.getPhysicsTarget());
-    this.enemyManager = new EnemyManager(this, {
-      walkingSpawns: this.enemySpawns,
-      targetWalkingCount: this.enemySpawns.length,
-      targetFlyingCount: 2
-    });
+    this.enemyManager = new EnemyManager(this);
     this.createHud(viewWidth);
     this.containerForBust = this.add.container(0, 0);
     this.setRandomPosForBlackHoles();
@@ -104,144 +99,6 @@ export class MainScene extends Phaser.Scene {
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
     this.createDebugZoomControls(viewWidth);
-  }
-
-  // --- ИНТЕГРАЦИЯ РЕДАКТОРА УРОВНЕЙ ---
-  buildLevelFromJson(levelData) {
-    const graphics = this.add.graphics();
-    const soil = 0x59412f;
-    const grass = 0x7cb342;
-    const dropThroughSoil = 0x334155;
-    const dropThroughGrass = 0x475569;
-
-    // 1. Рисуем Платформы и Зоны
-    levelData.platforms.forEach(p => {
-      const x = p.centerX;
-      const y = p.centerY;
-      const w = p.width;
-      const h = p.height;
-
-      if (p.type === 'solid') {
-        // top-left координаты для графики
-        this.drawPlatform(graphics, x - w/2, y - h/2, w, h, soil, grass);
-        this.addPlatformBody(x, y, w, h, { type: Platform.TYPES.SOLID });
-      }
-      else if (p.type === 'drop-through') {
-        this.drawPlatform(graphics, x - w/2, y - h/2, w, h, dropThroughSoil, dropThroughGrass);
-        this.addPlatformBody(x, y, w, h, { type: Platform.TYPES.DROP_THROUGH });
-      }
-      else if (p.type === 'wall-slide') {
-        this.zoneManager.addZone(new WallSlideZone(this, x, y, w, h, { direction: p.direction, debug: true }));
-      }
-    });
-
-    // 2. Расставляем Точки (Спавны, Враги, Лут)
-    let enemyIdx = 1;
-    levelData.points.forEach(pt => {
-      if (pt.type === 'enemy') {
-        this.enemySpawns.push({ id: `enemy-json-${enemyIdx++}`, x: pt.x, y: pt.y, type: 'ground' });
-      }
-      else if (pt.type === 'heart') {
-        this.positionsForHeart.push({ x: pt.x, y: pt.y, active: false });
-      }
-      else if (pt.type === 'hole') {
-        this.createBlackHole({ x: pt.x, y: pt.y });
-      }
-    });
-
-    // Если на карте забыли поставить сердца, добавим одно по умолчанию, чтобы код не упал
-    if (this.positionsForHeart.length === 0) {
-      this.positionsForHeart.push({ x: this.worldWidth / 2, y: this.worldHeight / 2, active: false });
-    }
-  }
-
-  // --- СТАРАЯ ХАРДКОД-КАРТА (FALLBACK) ---
-  buildFallbackLevel() {
-    const s = WORLD_SCALE;
-    const graphics = this.add.graphics();
-    const soil = 0x59412f; const grass = 0x7cb342; const rock = 0x7f8c8d;
-
-    // Рисуем старую графику
-    this.drawPlatform(graphics, 0, this.worldHeight - 170 * s, this.worldWidth, 170 * s, soil, grass);
-    this.drawPlatform(graphics, 150 * s, 700 * s, 330 * s, 58 * s, soil, grass);
-    this.drawPlatform(graphics, 430 * s, 610 * s, 220 * s, 48 * s, soil, grass);
-    this.drawPlatform(graphics, 680 * s, 535 * s, 210 * s, 44 * s, soil, grass);
-    this.drawPlatform(graphics, 935 * s, 462 * s, 230 * s, 46 * s, soil, grass);
-    this.drawPlatform(graphics, 1220 * s, 392 * s, 210 * s, 44 * s, soil, grass);
-    this.drawPlatform(graphics, 1490 * s, 334 * s, 200 * s, 42 * s, soil, grass);
-    this.drawPlatform(graphics, 1725 * s, 270 * s, 170 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 980 * s, 730 * s, 300 * s, 56 * s, soil, grass);
-    this.drawPlatform(graphics, 1340 * s, 620 * s, 220 * s, 46 * s, soil, grass);
-    this.drawPlatform(graphics, 1610 * s, 520 * s, 170 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 330 * s, 455 * s, 150 * s, 40 * s, soil, grass);
-    this.drawPlatform(graphics, 520 * s, 360 * s, 140 * s, 36 * s, soil, grass);
-    this.drawPlatform(graphics, 720 * s, 280 * s, 130 * s, 34 * s, soil, grass);
-
-    graphics.fillStyle(rock, 1);
-    graphics.fillRoundedRect(122 * s, 804 * s, 126 * s, 106 * s, 14 * s);
-    graphics.fillRoundedRect(724 * s, 822 * s, 154 * s, 88 * s, 16 * s);
-    graphics.fillRoundedRect(1440 * s, 778 * s, 188 * s, 132 * s, 18 * s);
-    graphics.fillRoundedRect(1742 * s, 610 * s, 94 * s, 82 * s, 14 * s);
-    graphics.fillRoundedRect(576 * s, 272 * s, 62 * s, 68 * s, 12 * s);
-
-    // Старые коллайдеры
-    this.addPlatformBody(this.worldWidth * 0.5, this.worldHeight - 85 * s, this.worldWidth, 170 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(315 * s, 729 * s, 330 * s, 58 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(540 * s, 634 * s, 220 * s, 48 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(785 * s, 557 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1050 * s, 485 * s, 230 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1325 * s, 414 * s, 210 * s, 44 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1590 * s, 355 * s, 200 * s, 42 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1810 * s, 290 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1130 * s, 758 * s, 300 * s, 56 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1450 * s, 643 * s, 220 * s, 46 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(1695 * s, 540 * s, 170 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(405 * s, 475 * s, 150 * s, 40 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(590 * s, 378 * s, 140 * s, 36 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(785 * s, 297 * s, 130 * s, 34 * s, { type: Platform.TYPES.DROP_THROUGH });
-    this.addPlatformBody(185 * s, 857 * s, 126 * s, 106 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(801 * s, 866 * s, 154 * s, 88 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(1534 * s, 844 * s, 188 * s, 132 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(1789 * s, 651 * s, 94 * s, 82 * s, { type: Platform.TYPES.SOLID });
-    this.addPlatformBody(607 * s, 306 * s, 62 * s, 68 * s, { type: Platform.TYPES.SOLID });
-
-    // Старые Зоны скольжения
-    this.zoneManager.addZone(new WallSlideZone(this, 185 * s + 63 * s + 10, 857 * s, 20, 106 * s, { direction: -1, debug: true }));
-    this.zoneManager.addZone(new WallSlideZone(this, 801 * s - 77 * s - 10, 866 * s, 20, 88 * s, { direction: 1, debug: true }));
-
-    // Старые Спавны
-    this.enemySpawns =[
-      { id: 'enemy-1', x: 360 * s, y: 650 * s, type: 'ground' },
-      { id: 'enemy-2', x: 1120 * s, y: 580 * s, type: 'ground' },
-      { id: 'enemy-3', x: 1540 * s, y: 250 * s, type: 'ground' }
-    ];
-
-    this.positionsForHeart =[
-      {x: 1400 * s, y: 580 * s, active: false},
-      {x: 1660 * s, y: 470 * s, active: false},
-      {x: 1800 * s, y: 230 * s, active: false},
-      {x: 1100 * s, y: 420 * s, active: false},
-      {x: 820 * s, y: 240 * s, active: false},
-      {x: 760 * s, y: 490 * s, active: false},
-      {x: 360 * s, y: 410 * s, active: false}
-    ];
-
-    this.positionsForMines =[
-      {x: 1100 * s, y: 890 * s, active: false},
-      {x: 1740 * s, y: 500 * s, active: false},
-      {x: 1200 * s, y: 710 * s, active: false},
-      {x: 1500 * s, y: 600 * s, active: false},
-      {x: 850 * s, y: 515 * s, active: false}
-    ];
-
-     this.positionsForBombas =[
-      //{x: 600 * s, y: 890 * s, active: false},
-      //{x: 300 * s, y: 890 * s, active: false}
-      //{x: 1000 * s, y: 890 * s, active: false},
-      //{x: 1900 * s, y: 890 * s, active: false},
-      {x: 450 * s, y: 435 * s, active: false},
-      //{x: 850 * s, y: 515 * s, active: false}
-    ];
   }
 
   update(time, delta) {
@@ -464,15 +321,6 @@ export class MainScene extends Phaser.Scene {
           .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
           .on('pointerdown', onClick);
     return { button, label: text };
-  }
-
-  drawPlatform(graphics, x, y, width, height, soilColor, grassColor) {
-    graphics.fillStyle(soilColor, 1);
-    graphics.fillRoundedRect(x, y, width, height, 18);
-    graphics.fillStyle(grassColor, 1);
-    graphics.fillRoundedRect(x, y - 10, width, 24, 12);
-    graphics.fillStyle(0x000000, 0.08);
-    graphics.fillRoundedRect(x + 14, y + 18, width - 28, height - 30, 14);
   }
 
   createBlackHole(position) {
