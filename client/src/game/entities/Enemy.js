@@ -65,6 +65,31 @@ export class Enemy extends Phaser.GameObjects.Container {
     }
   }
 
+  applyServerState(state, time = this.scene.time.now) {
+    if (!state || !this.hitbox?.body) {
+      return;
+    }
+
+    this.facingDirection = state.facingDirection ?? this.facingDirection;
+    this.hp = Phaser.Math.Clamp(state.hp ?? this.hp, 0, this.maxHp);
+    this.hitbox.body.enable = state.alive !== false;
+    this.attackZone.setVisible(state.alive !== false);
+
+    if (typeof state.x === 'number' && typeof state.y === 'number') {
+      this.hitbox.body.reset(state.x, state.y);
+    }
+
+    this.syncAttackZone(time);
+    this.syncHpText();
+    this.applyVisualState(state, time);
+    this.setPosition(Math.round(this.hitbox.x), Math.round(this.hitbox.y + this.hitbox.height * 0.5));
+  }
+
+  applyVisualState(state, time = this.scene.time.now) {
+    const isAttackState = state.state === 'attack' || this.isAttacking(time);
+    if (this.visual.setFillStyle) this.visual.setFillStyle(isAttackState ? 0xf97316 : 0xb91c1c, isAttackState ? 1 : 0.85);
+  }
+
   syncHpText() {
     if (!this.active || !this.showStats || !this.healthIndicator) return;
     const textX = Math.round(this.hitbox.x);

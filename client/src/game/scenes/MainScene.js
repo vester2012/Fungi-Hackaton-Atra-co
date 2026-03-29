@@ -10,11 +10,6 @@ import {ParallaxBackground} from "../systems/ParallaxBackground";
 
 const Phaser = window.Phaser;
 const WORLD_SCALE = 2;
-const ENEMY_SPAWNS = [
-  { id: 'enemy-1', x: 360 * WORLD_SCALE, y: 650 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-2', x: 1120 * WORLD_SCALE, y: 580 * WORLD_SCALE, type: 'ground' },
-  { id: 'enemy-3', x: 1540 * WORLD_SCALE, y: 250 * WORLD_SCALE, type: 'ground' }
-];
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -31,6 +26,9 @@ export class MainScene extends Phaser.Scene {
     this.hearts = 0;
     this.heartsConstNumber = 3;
     this.heartHealing = 25;
+    this.persentOfMina = 0.7;
+    this.bombaDemage = 0.7;
+    this.bombasCount = 0;
 
     // Базовые массивы для данных из JSON
     this.enemySpawns = [];
@@ -52,8 +50,6 @@ export class MainScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
-
-    // this.drawBackground(this.worldWidth, this.worldHeight);
 
     this.platforms = this.physics.add.staticGroup();
     this.zoneManager = new ZoneManager(this);
@@ -77,9 +73,11 @@ export class MainScene extends Phaser.Scene {
       targetFlyingCount: 2
     });
     this.createHud(viewWidth);
-    this.createBlackHole({x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE});
-    this.createBlackHole({x: 550 * WORLD_SCALE, y: 450 * WORLD_SCALE});
-    this.createBlackHole({x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE});
+    this.containerForBust = this.add.container(0, 0);
+    this.setRandomPosForBlackHoles();
+    this.generateHearts();
+    this.createMines();
+    this.createBombas();
 
     this.add.text(viewWidth * 0.5, 90, 'Main Game Scene', {
       fontFamily: 'JungleAdventurer',
@@ -88,9 +86,7 @@ export class MainScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0);
 
     // UI Возврата
-    const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1)
-      .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
+    const backButton = this.add.rectangle(viewWidth * 0.5, viewHeight - 90, 240, 58, 0xf59e0b, 1).setInteractive({ useHandCursor: true }).setScrollFactor(0);
 
     const backLabel = this.add.text(viewWidth * 0.5, viewHeight - 90, 'Back To Menu', {
       fontFamily: 'JungleAdventurer',
@@ -107,7 +103,6 @@ export class MainScene extends Phaser.Scene {
     backLabel.setDepth(1);
     this.cameras.main.startFollow(this.character.getPhysicsTarget(), true, 0.12, 0.12);
     this.createDebugZoomControls(viewWidth);
-    this.generateHearts();
   }
 
   // --- ИНТЕГРАЦИЯ РЕДАКТОРА УРОВНЕЙ ---
@@ -142,12 +137,7 @@ export class MainScene extends Phaser.Scene {
     // 2. Расставляем Точки (Спавны, Враги, Лут)
     let enemyIdx = 1;
     levelData.points.forEach(pt => {
-      if (pt.type === 'spawn') {
-        this.spawnPoint = { x: pt.x, y: pt.y };
-        const spawnCircle = this.add.circle(pt.x, pt.y, 22, 0xff7043, 0.4).setStrokeStyle(5, 0xffcc80, 0.9);
-        this.add.text(pt.x + 40, pt.y - 6, 'Spawn', { fontFamily: 'JungleAdventurer', fontSize: '20px', color: '#fff3e0' });
-      }
-      else if (pt.type === 'enemy') {
+      if (pt.type === 'enemy') {
         this.enemySpawns.push({ id: `enemy-json-${enemyIdx++}`, x: pt.x, y: pt.y, type: 'ground' });
       }
       else if (pt.type === 'heart') {
@@ -227,7 +217,7 @@ export class MainScene extends Phaser.Scene {
 
     this.positionsForHeart =[
       {x: 1400 * s, y: 580 * s, active: false},
-      {x: 1700 * s, y: 470 * s, active: false},
+      {x: 1660 * s, y: 470 * s, active: false},
       {x: 1800 * s, y: 230 * s, active: false},
       {x: 1100 * s, y: 420 * s, active: false},
       {x: 820 * s, y: 240 * s, active: false},
@@ -235,10 +225,24 @@ export class MainScene extends Phaser.Scene {
       {x: 360 * s, y: 410 * s, active: false}
     ];
 
-    this.createBlackHole({x: 500 * s, y: 850 * s});
-    this.createBlackHole({x: 550 * s, y: 450 * s});
-    this.createBlackHole({x: 1300 * s, y: 850 * s});
+    this.positionsForMines =[
+      {x: 1100 * s, y: 890 * s, active: false},
+      {x: 1740 * s, y: 500 * s, active: false},
+      {x: 1200 * s, y: 710 * s, active: false},
+      {x: 1500 * s, y: 600 * s, active: false},
+      {x: 850 * s, y: 515 * s, active: false}
+    ];
+
+     this.positionsForBombas =[
+      //{x: 600 * s, y: 890 * s, active: false},
+      //{x: 300 * s, y: 890 * s, active: false}
+      //{x: 1000 * s, y: 890 * s, active: false},
+      //{x: 1900 * s, y: 890 * s, active: false},
+      {x: 450 * s, y: 435 * s, active: false},
+      //{x: 850 * s, y: 515 * s, active: false}
+    ];
   }
+
   update(time, delta) {
     if (this.character) {
       this.character.update(time, delta);
@@ -264,7 +268,7 @@ export class MainScene extends Phaser.Scene {
     this.enemyManager?.update(time, delta, this.character);
     this.updateEnemysPlayers(time, delta);
     this.updateHud(time, delta);
-    //this.updateSocketInfo(time, delta);
+    this.updateSocketInfo(time, delta);
   }
 
   updateEnemysPlayers(time, delta) {
@@ -302,20 +306,19 @@ export class MainScene extends Phaser.Scene {
     for (const [key, value] of Object.entries(players)) {
       str += `id:${players[key].id}   hp:${players[key].hp} (${players[key].x}:${players[key].y})` + '\n'
     }
-
-    if (this.textInfo) {
-      this.textInfo.setText("info socket:" + "\n" + str)
-
-    } else {
-      this.textInfo = this.add.text(500, 500, "info socket:" + "\n" + str, { fontFamily: 'JungleAdventurer', fontSize: 64, color: '#ffffff' }).setOrigin(0.5);
-    }
+      unit_manager.textRoomInfo?.setText("info socket:" + "\n" + str)
   }
 
   checkCollision(rect1, rect2) {
-    return rect1.x < rect2.x + rect2.w &&
-        rect1.x + rect1.w > rect2.x &&
-        rect1.y < rect2.y + rect2.h &&
-        rect1.y + rect1.h > rect2.y;
+    const rect1Width = rect1.w ?? rect1.width;
+    const rect1Height = rect1.h ?? rect1.height;
+    const rect2Width = rect2.w ?? rect2.width;
+    const rect2Height = rect2.h ?? rect2.height;
+
+    return rect1.x < rect2.x + rect2Width &&
+        rect1.x + rect1Width > rect2.x &&
+        rect1.y < rect2.y + rect2Height &&
+        rect1.y + rect1Height > rect2.y;
   }
 
   getCollisionAttack() {
@@ -325,12 +328,7 @@ export class MainScene extends Phaser.Scene {
     const attackRect = this.character.getAttackHitbox().getBounds();
 
     otherPlayers.forEach((player) => {
-      const enemyHitbox = {
-        x: player.obj.hitbox.x,
-        y: player.obj.hitbox.y,
-        w: player.obj.hitbox.width,
-        h: player.obj.hitbox.height
-      };
+      const enemyHitbox = player.obj.hitbox.getBounds();
 
       if (this.checkCollision(attackRect, enemyHitbox)) {
         unit_manager.socket.emit('playerHit', {
@@ -338,45 +336,6 @@ export class MainScene extends Phaser.Scene {
         });
       }
     });
-  }
-
-  drawBackground(width, height) {
-    const s = WORLD_SCALE;
-
-    this.add.rectangle(width * 0.5, height * 0.5, width, height, 0x132238, 1);
-    this.add.ellipse(260 * s, 180 * s, 260 * s, 260 * s, 0xf3d17a, 0.16);
-    this.add.ellipse(width - 220 * s, 160 * s, 320 * s, 220 * s, 0x8ec5ff, 0.09);
-
-    const graphics = this.add.graphics();
-
-    graphics.fillStyle(0x1a2d46, 1);
-    graphics.beginPath();
-    graphics.moveTo(0, height * 0.62);
-    graphics.lineTo(220 * s, height * 0.48);
-    graphics.lineTo(520 * s, height * 0.58);
-    graphics.lineTo(760 * s, height * 0.43);
-    graphics.lineTo(1030 * s, height * 0.56);
-    graphics.lineTo(1340 * s, height * 0.39);
-    graphics.lineTo(1660 * s, height * 0.53);
-    graphics.lineTo(width, height * 0.45);
-    graphics.lineTo(width, height);
-    graphics.lineTo(0, height);
-    graphics.closePath();
-    graphics.fillPath();
-
-    graphics.fillStyle(0x203753, 0.95);
-    graphics.beginPath();
-    graphics.moveTo(0, height * 0.72);
-    graphics.lineTo(340 * s, height * 0.61);
-    graphics.lineTo(670 * s, height * 0.68);
-    graphics.lineTo(990 * s, height * 0.58);
-    graphics.lineTo(1320 * s, height * 0.71);
-    graphics.lineTo(1650 * s, height * 0.63);
-    graphics.lineTo(width, height * 0.7);
-    graphics.lineTo(width, height);
-    graphics.lineTo(0, height);
-    graphics.closePath();
-    graphics.fillPath();
   }
 
   addPlatformBody(x, y, width, height, options = {}) {
@@ -407,12 +366,7 @@ export class MainScene extends Phaser.Scene {
     this.mobileUI = new MobileUI(this, this.character.controller);
     this.character.setDepth(2);
 
-    this.physics.add.collider(
-        this.character.getPhysicsTarget(),
-        this.platforms,
-        undefined,
-        (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform)
-    );
+    this.physics.add.collider(this.character.getPhysicsTarget(), this.platforms, undefined, (_characterBody, platform) => this.character.shouldCollideWithPlatform(platform));
 
     this.character.events.on('attack', () => {
       this.getCollisionAttack();
@@ -474,6 +428,13 @@ export class MainScene extends Phaser.Scene {
   }
 
   createDebugZoomControls(viewWidth) {
+
+    unit_manager.textRoomInfo = this.add.text(200, 42, 'Zoom', {
+      fontFamily: 'JungleAdventurer',
+      fontSize: '20px',
+      color: '#e2e8f0'
+    }).setScrollFactor(0);
+
     const zoomLabel = this.add.text(viewWidth - 210, 42, 'Zoom', {
       fontFamily: 'JungleAdventurer',
       fontSize: '20px',
@@ -496,10 +457,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   createDebugButton(x, y, label, onClick) {
-    const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95)
-      .setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
-    const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' })
-      .setOrigin(0.5).setScrollFactor(0);
+    const button = this.add.rectangle(x, y, 88, 52, 0x334155, 0.95).setStrokeStyle(2, 0x94a3b8, 0.7).setInteractive({ useHandCursor: true }).setScrollFactor(0);
+    const text = this.add.text(x, y, label, { fontFamily: 'JungleAdventurer', fontSize: '28px', color: '#f8fafc' }).setOrigin(0.5).setScrollFactor(0);
     button.on('pointerover', () => button.setFillStyle(0x475569, 0.98))
           .on('pointerout', () => button.setFillStyle(0x334155, 0.95))
           .on('pointerdown', onClick);
@@ -519,7 +478,7 @@ export class MainScene extends Phaser.Scene {
     this.animHole = this.add.spine(position.x, position.y, 'blackhole_spine_SPO', 'idle', true);
     this.animHole.setScale(0.5);
 
-    this.blackHoleZone = this.add.zone(this.animHole.x - 35 * WORLD_SCALE, this.animHole.y - 15 * WORLD_SCALE, 80 * WORLD_SCALE, 50 * WORLD_SCALE);
+    this.blackHoleZone = this.add.zone(this.animHole.x - 15 * WORLD_SCALE, this.animHole.y - 15 * WORLD_SCALE, 80 * WORLD_SCALE, 50 * WORLD_SCALE);
     this.physics.add.existing(this.blackHoleZone);
 
     this.blackHoleZone.body.setAllowGravity(false);
@@ -561,34 +520,60 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  setRandomPosForBlackHoles(){
+    const freePositionsBottom = [{x: 1750 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 500 * WORLD_SCALE, y: 850 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 850 * WORLD_SCALE}];
+    const freePositionsTop = [{x: 1200 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1700 * WORLD_SCALE, y: 600 * WORLD_SCALE}, {x: 1400 * WORLD_SCALE, y: 490 * WORLD_SCALE}, {x: 1000 * WORLD_SCALE, y: 560 * WORLD_SCALE}, {x: 1800 * WORLD_SCALE, y: 100 * WORLD_SCALE}, {x: 1300 * WORLD_SCALE, y: 190 * WORLD_SCALE}, {x: 850 * WORLD_SCALE, y: 350 * WORLD_SCALE}, {x: 580 * WORLD_SCALE, y: 450 * WORLD_SCALE}];
+
+    const posBottom = Phaser.Utils.Array.GetRandom(freePositionsBottom);
+    this.createBlackHole({x: posBottom.x, y: posBottom.y});
+
+    const shuffled = Phaser.Utils.Array.Shuffle([...freePositionsTop]);
+    const pos1 = shuffled[0];
+    const pos2 = shuffled[1];
+    const pos3 = shuffled[2];
+
+    this.createBlackHole({x: pos1.x, y: pos1.y});
+    this.createBlackHole({x: pos2.x, y: pos2.y});
+    this.createBlackHole({x: pos3.x, y: pos3.y});
+  }
+
   generateHearts(delayedTime = 0) {
     this.time.delayedCall(delayedTime, () => {
-        if(this.hearts >= this.heartsConstNumber) {
-          this.generateHearts(5000);
-          return;
+      if (this.hearts >= this.heartsConstNumber) {
+        this.generateHearts(5000);
+        return;
+      } else {
+        const heartsLength = this.hearts;
+        for (let i = 1; i <= (this.heartsConstNumber - heartsLength); i++) {
+          this.addHeartToRandomPos();
         }
-        else {
-          const heartsLength = this.hearts;
-          for(let i = 1; i<= (this.heartsConstNumber - heartsLength); i++){
-            this.addHeartToRandomPos();
-          }
-          this.generateHearts(5000);
-        }
+        this.generateHearts(5000);
+      }
     });
   }
 
-  addHeartToRandomPos(){
+  addHeartToRandomPos() {
     let heart;
     const freePositions = this.positionsForHeart.filter(p => !p.active);
     if (freePositions.length > 0) {
-        const pos = Phaser.Utils.Array.GetRandom(freePositions);
-        pos.active = true;
-        
-        heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
-        this.hearts += 1;
-        heart.posRef = pos;
-        
-        this.addPhysicForNewHeart(heart);
+
+      const pos = Phaser.Utils.Array.GetRandom(freePositions);
+      pos.active = true;
+      heart = this.add.image(pos.x, pos.y, 'heart').setScale(0.25);
+      this.hearts += 1;
+      heart.posRef = pos;
+
+      this.addPhysicForNewHeart(heart);
+
+      heart.pulseTween = this.tweens.add({
+        targets: heart,
+        scaleX: 0.28,
+        scaleY: 0.28,
+        duration: 300,
+        ease: 'Sine.inOut',
+        yoyo: true,
+        repeat: -1 // бесконечно
+      });
     }
   }
 
@@ -612,40 +597,196 @@ export class MainScene extends Phaser.Scene {
 
   onHeartTouch(heart, heartZone){
     if (this.heartTouched) return;
-  
+
     console.log(heart)
+
     this.heartTouched = true;
-    console.log("heartTouced");
-    
+    console.log("heartTouched");
+
     // восстанавливаем hp
     const curHp = this.character.getHp();
     const maxHp = this.character.getMaxHp();
     ((maxHp - curHp) >= this.heartHealing) ? this.character.setHp(curHp + this.heartHealing) : this.character.setHp(maxHp);
 
     this.tweens.add({
+      targets: this.character,
+      scaleX: 1.5,
+      scaleY: 1.7,
+      duration: 150,
+      ease: 'Cubic.in',
+      yoyo: true
+    });
+
+    if (heartZone.overlapRef) {
+        heartZone.overlapRef.destroy();
+        heartZone.overlapRef = null;
+    }
+    if (heartZone.body) {
+        heartZone.body.destroy();
+    }
+    heartZone.heart = null;
+    heartZone.destroy();
+
+    this.tweens.add({
       targets: heart,
       alpha: 0,
-      duration: 1200,
+      duration: 300,
       onComplete: () => {
         this.hearts--;
         if (heart) {
           heart.posRef.active = false;
+          if (heart.pulseTween) heart.pulseTween.stop();
           heart.destroy();
-          heartZone.heart = null;
         }
-        if (heartZone.overlapRef) {
-          heartZone.overlapRef.destroy();
-          heartZone.overlapRef = null;
-        }
-
-        if (heartZone.body) {
-          heartZone.body.destroy();
-        }
-
-        heartZone.destroy();
         this.heartTouched = false;
       }
     });
 
+  }
+
+  createMines(){
+     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForMines]);
+     const pos1 = shuffled[0];
+     const pos2 = shuffled[1];
+     const pos3 = shuffled[1];
+
+     const mina1 = this.add.image(pos1.x, pos1.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina1);
+     const mina2 = this.add.image(pos2.x, pos2.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina2);
+     const mina3 = this.add.image(pos3.x, pos3.y, 'mina').setScale(0.13);
+     this.containerForBust.add(mina3);
+     this.addPhysicForNewMina(mina1);
+     this.addPhysicForNewMina(mina2);
+     this.addPhysicForNewMina(mina3);
+  }
+
+  addPhysicForNewMina(mina){
+    const minaZone = this.add.zone(
+      mina.x,
+      mina.y,
+      10 * WORLD_SCALE,
+      10 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(minaZone);
+
+    minaZone.body.setAllowGravity(false);
+    minaZone.body.setImmovable(true);
+
+    if (this.character) {
+      this.physics.add.overlap(this.character.getPhysicsTarget(), minaZone, this.onMinaTouch.bind(this, mina, minaZone), null, this);
+    }
+  }
+
+  onMinaTouch(mina, minaZone){
+    if (this.minaTouched) return;
+  
+    this.minaTouched = true;
+    console.log("minaTouched");
+    
+    // удаляем hp
+    const curHp = this.character.getHp();
+    const nextHp = Math.round(curHp*this.persentOfMina);
+    this.character.setHp(nextHp);
+
+    if (minaZone.overlapRef) {
+        minaZone.overlapRef.destroy();
+        minaZone.overlapRef = null;
+    }
+    if (minaZone.body) {
+        minaZone.body.destroy();
+    }
+    
+    minaZone.destroy();
+     // взрыв ???
+    // прячем мину
+    this.tweens.add({
+      targets: mina,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        if (mina) {
+          mina.destroy();
+        }
+        this.minaTouched = false;
+      }
+    });
+  }
+
+  createBombas(){
+     const shuffled = Phaser.Utils.Array.Shuffle([...this.positionsForBombas]);
+     const pos1 = shuffled[0];
+     //const pos2 = shuffled[1];
+     //const pos3 = shuffled[1];
+
+     const bomba1 = this.add.image(pos1.x, pos1.y, 'bomba').setScale(0.13);
+     this.containerForBust.add(bomba1);
+     //const bomba2 = this.add.image(pos2.x, pos2.y, 'bomba').setScale(0.13);
+     //this.containerForBust.add(bomba2);
+     //const bomba3 = this.add.image(pos3.x, pos3.y, 'bomba').setScale(0.13);
+     //this.containerForBust.add(bomba3);
+     this.addPhysicForNewBomba(bomba1);
+     //this.addPhysicForNewBomba(bomba2);
+     //this.addPhysicForNewBomba(bomba3);
+  }
+
+  addPhysicForNewBomba(bomba){
+    const bombaZone = this.add.zone(
+      bomba.x,
+      bomba.y,
+      10 * WORLD_SCALE,
+      10 * WORLD_SCALE
+    );
+
+    this.physics.add.existing(bombaZone);
+
+    bombaZone.body.setAllowGravity(false);
+    bombaZone.body.setImmovable(true);
+
+    if (this.character) {
+      this.physics.add.overlap(this.character.getPhysicsTarget(), bombaZone, this.onBombaTouch.bind(this, bomba, bombaZone), null, this);
+    }
+  }
+
+  onBombaTouch(bomba, bombaZone){
+    if (this.bombaTouched) return;
+  
+    this.bombaTouched = true;
+    console.log("bombaTouched");
+    
+
+    if (bombaZone.overlapRef) {
+        bombaZone.overlapRef.destroy();
+        bombaZone.overlapRef = null;
+    }
+    if (bombaZone.body) {
+        bombaZone.body.destroy();
+    }
+    
+    bombaZone.destroy();
+    // добавляем в счетчик бомб
+    this.bombasCount++;
+
+    // прячем бомбу
+    this.tweens.add({
+      targets: bomba,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        if (bomba) {
+          bomba.destroy();
+        }
+        this.bombaTouched = false;
+      }
+    });
+  }
+
+  toUseBomba(){
+    if(this.bombasCount === 0) return;
+    this.bombasCount--;
+    // анимация кидания бомбы
+
+    // hp врага падает на параметр this.bombaDemage
   }
 }

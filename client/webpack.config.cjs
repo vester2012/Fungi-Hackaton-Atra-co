@@ -21,6 +21,11 @@ module.exports = (_, argv) => {
     module: {
       rules: [
         {
+          test: /\.(js|jsx)$/,
+          exclude: /node_modules/,
+          use: 'babel-loader'
+        },
+        {
           test: /\.css$/i,
           use: ['style-loader', 'css-loader']
         }
@@ -28,6 +33,7 @@ module.exports = (_, argv) => {
     },
 
     resolve: {
+      extensions: ['.js', '.jsx'],
       alias: {
         '@': path.resolve(__dirname, 'src'),
         '@libs': path.resolve(__dirname, '../libs')

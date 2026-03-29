@@ -1,7 +1,12 @@
 import './style.css';
 import { io } from "socket.io-client";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { bootGame } from './game/bootGame.js';
 import {unit_manager} from "./game/unit_manager.js";
+
+import './style.css';
+import App from './App.jsx';
 
 const params = new URLSearchParams(window.location.search);
 const isDebug = params.has('debug');
@@ -51,15 +56,11 @@ if (isDebug) {
     });
 }
 
-async function startGame() {
-    if (document.fonts?.load) {
-        await document.fonts.load('16px "JungleAdventurer"');
-    }
-
-    bootGame('app');
-}
-
-startGame();
+ReactDOM.createRoot(document.getElementById('app')).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+);
 
 //* SOCKET *//
 
@@ -102,8 +103,14 @@ socket.on('loginSuccess', (data) => {
 
 socket.on('enemyDied', (data) => {
     const enemyEntry = unit_manager.info.enemies[data.id];
+    if (enemyEntry) {
+        enemyEntry.alive = false;
+        enemyEntry.hp = 0;
+    }
     if (enemyEntry && enemyEntry.obj) {
-        enemyEntry.obj.destroy(); // Враг исчезнет у всех в комнате
+        enemyEntry.obj.setHp?.(0);
+        enemyEntry.obj.destroy();
+        enemyEntry.obj = null;
     }
 });
 // Получаем список всех игроков при входе
@@ -112,7 +119,29 @@ socket.on('currentPlayers', (serverPlayers) => {
 });
 
 socket.on('currentEnemies', (serverEnemies) => {
-    Object.assign(unit_manager.info.enemies, serverEnemies);
+    unit_manager.info.enemies = { ...serverEnemies };
+});
+
+socket.on('enemiesState', (serverEnemies) => {
+    const nextEnemies = {};
+
+    Object.entries(serverEnemies).forEach(([id, enemyState]) => {
+        nextEnemies[id] = {
+            ...(unit_manager.info.enemies[id] || {}),
+            ...enemyState,
+            obj: unit_manager.info.enemies[id]?.obj || null
+        };
+    });
+
+    unit_manager.info.enemies = nextEnemies;
+});
+
+socket.on('enemyRespawned', (enemyInfo) => {
+    unit_manager.info.enemies[enemyInfo.id] = {
+        ...(unit_manager.info.enemies[enemyInfo.id] || {}),
+        ...enemyInfo,
+        obj: null
+    };
 });
 
 // Новый игрок зашел
@@ -156,16 +185,24 @@ socket.on('hpUpdate', (data) => {
     const playerEntry = players[data.id];
     // Проверяем: есть ли запись, есть ли объект и не уничтожен ли он в Phaser
     if (playerEntry && playerEntry.obj && playerEntry.obj.active) {
+        const prevHp = typeof playerEntry.hp === 'number' ? playerEntry.hp : playerEntry.obj.getHp?.();
         playerEntry.hp = data.hp;
-        playerEntry.obj.setHp(data.hp);
+        if (typeof data.damage === 'number' && data.damage > 0 && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(data.damage, data.hp);
+        } else if (typeof prevHp === 'number' && data.hp < prevHp && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(prevHp - data.hp, data.hp);
+        } else {
+            playerEntry.obj.setHp(data.hp);
+        }
     }
 });
 
 socket.on('enemyHpUpdate', (data) => {
     const enemyEntry = unit_manager.info.enemies[data.id];
-    // Аналогичная проверка для врагов
-    if (enemyEntry && enemyEntry.obj && enemyEntry.obj.active) {
+    if (enemyEntry) {
         enemyEntry.hp = data.hp;
+    }
+    if (enemyEntry && enemyEntry.obj && enemyEntry.obj.active) {
         enemyEntry.obj.setHp(data.hp);
     }
 });

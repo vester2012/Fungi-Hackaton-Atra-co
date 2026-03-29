@@ -73,6 +73,25 @@ export class SkeletonBombEnemy extends Enemy {
     }
   }
 
+  applyServerState(state, time = this.scene.time.now) {
+    super.applyServerState(state, time);
+
+    if (!state || !this.visual?.state) {
+      return;
+    }
+
+    this.visual.scaleX = this.facingDirection > 0 ? -Math.abs(this.visual.scaleX) : Math.abs(this.visual.scaleX);
+
+    if (state.alive === false) {
+      this.setAnimation('idle', true);
+      this.visual.setAlpha(0.35);
+      return;
+    }
+
+    this.visual.setAlpha(1);
+    this.setAnimation(state.state === 'run' ? 'run' : 'idle', true);
+  }
+
   updatePatrol(time) {
     const bounds = this.getPatrolBounds();
     const leftBound = bounds.left;

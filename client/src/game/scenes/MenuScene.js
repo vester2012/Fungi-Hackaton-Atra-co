@@ -14,6 +14,8 @@ export class MenuScene extends Phaser.Scene {
     this.load.spine('skeleton_bomb_SPO', '/assets/anim/skeleton_bomb.json', '/assets/anim/skeleton_bomb.atlas')
 
     this.load.image('heart', '/assets/heart.png');
+    this.load.image('mina', '/assets/mina.png');
+    this.load.image('bomba', '/assets/bomba.png');
 
     this.load.audio('jump', ['/assets/audio/ma-jump.mp3', '/assets/audio/ma-jump.ogg']);
     this.load.audio('jump1', ['/assets/audio/ma-jump1.mp3', '/assets/audio/ma-jump1.ogg']);
@@ -26,7 +28,7 @@ export class MenuScene extends Phaser.Scene {
     this.load.audio('damage3', ['/assets/audio/ma-damage3.mp3', '/assets/audio/ma-damage3.ogg']);
     this.load.audio('bg-music', ['/assets/audio/bg-music.mp3', '/assets/audio/bg-music.ogg']);
     for (let i = 1; i <= 7; i++) {
-      this.load.image(`sky_layer_${i}`, `/assets/bg/bg_${i}.png`);
+      this.load.image(`sky_layer_${i}`, `/assets/bg/bg_${i}.webp`);
     }
     this.load.json('map_1', '/assets/level_map.json');
   }
@@ -100,16 +102,18 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
+    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
+      unit_manager.socket.emit("mm", { sid: localStorage.getItem('game_session_id'), numPlayersOfRoom: 3});
+      unit_manager.socket.once('mm_is_already', (data) => {
+        this.scene.start('MainScene');
+      });
+    });
+
+
     this.colorButton = this.createMenuButton(width * 0.5, 630 * 1.35, 360, 64,
         `Color: ${this.colors[this.currentColorIndex].name}`, 0x5758bb, () => {
           this.changePlayerColor();
         });
-
-
-    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
-
-    });
-
     this.input.once('pointerdown', () => {
       if (!this.bgMusic) {
         this.bgMusic = this.sound.add('bg-music', {
