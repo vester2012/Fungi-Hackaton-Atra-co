@@ -288,7 +288,7 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   playJumpSound() {
-    const jumpSoundKeys = ['jump', 'jump1', 'jump2', 'jump3'];
+    const jumpSoundKeys = ['jump', 'jump1', 'jump2'];
 
     if (this.scene.sound.locked) {
       return;
@@ -309,6 +309,16 @@ export class Character extends Phaser.GameObjects.Container {
     this.scene.sound.play(key, { volume: 0.2 });
   }
 
+  playDamageSound() {
+    const damageSoundKeys = ['damage', 'damage1', 'damage2', 'damage3'];
+
+    if (this.scene.sound.locked) {
+      return;
+    }
+
+    const key = Phaser.Utils.Array.GetRandom(damageSoundKeys);
+    this.scene.sound.play(key, { volume: 0.2 });
+  }
 
   applyRemoteState(x, y, now = this.scene.time.now) {
     const movedX = x - this.x;
@@ -380,6 +390,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hp = Math.max(0, this.hp - amount);
     this.syncHpText();
     this.playHitAnimation();
+    this.playDamageSound();
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
