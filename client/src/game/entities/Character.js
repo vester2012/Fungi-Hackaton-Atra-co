@@ -23,29 +23,9 @@ export class Character extends Phaser.GameObjects.Container {
     this.hitbox.body.setCollideWorldBounds(true);
     this.hitbox.body.setBounce(0, 0);
     this.hitbox.body.setDragX(1600);
-
-    // УБРАНО: this.hitbox.body.setMaxVelocity(600, 1200);
-    // Оставляем ограничение только по Y, чтобы игрок не проваливался сквозь платформы при падении
-    this.hitbox.body.setMaxVelocity(3000, 1200);
-
+    this.hitbox.body.setMaxVelocity(600, 1200); // Немного увеличил макс. скорость для сочности прыжка
     this.hitbox.body.setSize(this.hitbox.width, this.hitbox.height);
     this.hitbox.body.setOffset(0, 0);
-
-    // Параметры движения
-    this.moveSpeed = 400;
-    this.jumpSpeed = 800;
-    this.maxJumps = 2;
-    this.jumpCount = 0;
-
-    // --- ПАРАМЕТРЫ ДЭША (DASH) ---
-    this.dashSpeed = 1200;
-    this.dashDurationMs = 200;
-    this.dashCooldownMs = 800;
-    this.dashWindowMs = 250;
-    this.lastLeftTapAt = 0;
-    this.lastRightTapAt = 0;
-    this.lastDashAt = 0;
-    this.dashUntil = 0;
 
     // Параметры движения
     this.moveSpeed = 400;
@@ -121,34 +101,8 @@ export class Character extends Phaser.GameObjects.Container {
     const attackPressed = this.controller.attackJustPressed;
     const downPressed = this.controller.downJustPressed;
 
-    const leftJustPressed = this.controller.leftJustPressed;
-    const rightJustPressed = this.controller.rightJustPressed;
-
     const isGrounded = this.hitbox.body.blocked.down || this.hitbox.body.touching.down;
     const movingHorizontally = leftPressed !== rightPressed;
-
-    // Логика двойного нажатия (дэш)
-    if (leftJustPressed) {
-      if (now - this.lastLeftTapAt < this.dashWindowMs && now - this.lastDashAt > this.dashCooldownMs) {
-        this.dashUntil = now + this.dashDurationMs;
-        this.lastDashAt = now;
-        this.applyFacingDirection(-1);
-        this.playDashAnimation();
-      }
-      this.lastLeftTapAt = now;
-    }
-
-    if (rightJustPressed) {
-      if (now - this.lastRightTapAt < this.dashWindowMs && now - this.lastDashAt > this.dashCooldownMs) {
-        this.dashUntil = now + this.dashDurationMs;
-        this.lastDashAt = now;
-        this.applyFacingDirection(1);
-        this.playDashAnimation();
-      }
-      this.lastRightTapAt = now;
-    }
-
-    const dashing = this.isDashing(now);
 
     if (now - this.wallSlideState.lastActiveTime > 100) {
       this.wallSlideState.isActive = false;
@@ -160,10 +114,6 @@ export class Character extends Phaser.GameObjects.Container {
     }
 
     if (jumpPressed) {
-      if (dashing) {
-        this.dashUntil = 0; // Прерываем дэш, если игрок прыгнул
-      }
-
       if (this.wallSlideState.isActive && !isGrounded) {
         const jumpDir = -this.wallSlideState.direction;
         this.hitbox.body.setVelocity(jumpDir * this.wallJumpForceX, -this.wallJumpForceY);
@@ -186,28 +136,22 @@ export class Character extends Phaser.GameObjects.Container {
 
     const isWallJumping = !isGrounded && Math.abs(this.hitbox.body.velocity.x) > this.moveSpeed;
 
-    if (dashing) {
-      this.hitbox.body.setVelocityX(this.facingDirection * this.dashSpeed);
-      this.hitbox.body.setVelocityY(0); // во время дэша не падаем
-      this.hitbox.body.setAllowGravity(false);
-    } else {
-      this.hitbox.body.setAllowGravity(true);
-      if (!isWallJumping) {
-        if (leftPressed && !rightPressed) {
-          this.hitbox.body.setVelocityX(-this.moveSpeed);
-          this.applyFacingDirection(-1);
-        } else if (rightPressed && !leftPressed) {
-          this.hitbox.body.setVelocityX(this.moveSpeed);
-          this.applyFacingDirection(1);
-        } else {
-          this.hitbox.body.setVelocityX(0);
-        }
+    if (!isWallJumping) {
+      if (leftPressed && !rightPressed) {
+        this.hitbox.body.setVelocityX(-this.moveSpeed);
+        this.applyFacingDirection(-1);
+      } else if (rightPressed && !leftPressed) {
+        this.hitbox.body.setVelocityX(this.moveSpeed);
+        this.applyFacingDirection(1);
+      } else {
+        this.hitbox.body.setVelocityX(0);
       }
     }
 
     if (downPressed) {
       if (now - this.lastDownTapAt <= 350 && isGrounded && this.isStandingOnDropThroughPlatform()) {
         this.dropThroughUntil = now + this.dropThroughDurationMs;
+        // Delta time fix: вместо жесткого +5, сдвигаем на величину, зависящую от скорости падения
         this.hitbox.y += 300 * dt;
         this.hitbox.body.setVelocityY(200);
       }
@@ -221,7 +165,7 @@ export class Character extends Phaser.GameObjects.Container {
       }
     }
 
-    if (!this.isAttacking() && !this.isHit() && !dashing) {
+    if (!this.isAttacking() && !this.isHit()) {
       if (!isGrounded) {
         this.setAnimation(this.hitbox.body.velocity.y < 0 ? 'jump' : 'fly');
       } else if (this.wallSlideState.isActive) {
@@ -234,19 +178,6 @@ export class Character extends Phaser.GameObjects.Container {
       this.applySlotColor('body', this.currentTint);
     }
     this.syncContainerToHitbox();
-  }
-
-  isDashing(now = this.scene.time.now) {
-    return now < this.dashUntil;
-  }
-
-  playDashAnimation() {
-    this.anim.off('complete');
-    this.anim.play('dash');
-    this.anim.on('complete', () => {
-      this.anim.off('complete');
-      this.currentAnimation = '';
-    });
   }
 
   // МЕТОД ДЛЯ ЗОН (ВЫЗЫВАЕТСЯ ИЗ WallSlideZone)
