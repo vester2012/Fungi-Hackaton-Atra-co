@@ -207,6 +207,8 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', (data) => {
     joinToRoom(socket, data);
+    getPlayersAndEnemiesByRoom(io, '_queue', rooms.find(room => room.info.id === data.idRoom))
+
   });
 
   socket.on('playerDied', () => {
