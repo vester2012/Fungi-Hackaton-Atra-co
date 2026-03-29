@@ -100,16 +100,18 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
+    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
+      unit_manager.socket.emit("mm", { sid: localStorage.getItem('game_session_id'), numPlayersOfRoom: 3});
+      unit_manager.socket.once('mm_is_already', (data) => {
+        this.scene.start('MainScene');
+      });
+    });
+
+
     this.colorButton = this.createMenuButton(width * 0.5, 630 * 1.35, 360, 64,
         `Color: ${this.colors[this.currentColorIndex].name}`, 0x5758bb, () => {
           this.changePlayerColor();
         });
-
-
-    this.createMenuButton(width * 0.5, 540 * 1.35, 360, 64, '🥇 MATCHMAKING 🥇', 0x334155, () => {
-
-    });
-
     this.input.once('pointerdown', () => {
       if (!this.bgMusic) {
         this.bgMusic = this.sound.add('bg-music', {

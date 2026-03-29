@@ -153,13 +153,13 @@ io.on('connection', (socket) => {
         }
     }
     if (!queue) {
-      let listRooms = createRoom({sid, roomName: 'mm' + sid, passRoom: sid})
-      let room = rooms[rooms.length];
+      let listRooms = createRoom({sid, roomName: 'mm' + sid, roomPass: sid})
+      let room = rooms[rooms.length - 1];
       queue = {
-        totalLots: 4,
-        remainLots: 0,
-        players: [],
-        idRoom: room.id,
+        totalLots: numPlayersOfRoom,
+        remainLots: numPlayersOfRoom - 1,
+        players: [sid],
+        idRoom: room.info.id,
         passRoom: room.password
       }
       arrQueue.push(queue);
@@ -168,10 +168,13 @@ io.on('connection', (socket) => {
       socket.emit('update_list_rooms', { list_rooms });
     }
     else {
-      joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
-      if (queue.remainLots === 0) {
-        socket.emit('mm_is_already', { idRoom: queue.idRoom, passRoom: queue.passRoom });
-        arrQueue = arrQueue.filter(el=> el.sid !== sid);
+      if (!queue.isStarted) {
+        joinToRoom(socket, { sid, idRoom: queue.idRoom, passRoom: queue.passRoom }, true);
+        if (queue.remainLots === 0) {
+          queue.isStarted = true;
+          socket.emit('mm_is_already', { idRoom: queue.idRoom, passRoom: queue.passRoom });
+          arrQueue = arrQueue.filter(el=> el.sid !== sid);
+        }
       }
     }
 
