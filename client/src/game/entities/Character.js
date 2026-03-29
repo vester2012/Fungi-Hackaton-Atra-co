@@ -465,14 +465,13 @@ export class Character extends Phaser.GameObjects.Container {
 
   applySyncedDamage(amount, nextHp = null) {
     if (typeof nextHp === 'number') {
-      this.hp = nextHp;
+      this.hp = Phaser.Math.Clamp(nextHp, 0, this.maxHp);
     } else {
       this.hp = Math.max(0, this.hp - amount);
     }
     this.syncHpText();
     this.playHitAnimation();
     this.playDamageSound();
-    // Создаем всплывающий текст урона
     new DamagePopup(this.scene, this.hitbox.x, this.hitbox.y - this.hitbox.height * 0.5 - 8, amount);
     return this.hp;
   }
