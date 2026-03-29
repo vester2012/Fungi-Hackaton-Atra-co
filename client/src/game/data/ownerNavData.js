@@ -206,7 +206,7 @@ export const OWNER_NAV_DATA = {
       x: 1713,
       y: 302,
       actionType: "fridge",
-      wait: 4000,
+      wait: 2500,
     },
     {
       id: "act_2",
@@ -214,7 +214,7 @@ export const OWNER_NAV_DATA = {
       x: 645,
       y: 318,
       actionType: "computer",
-      wait: 10000,
+      wait: 4000,
     },
     {
       id: "act_3",
@@ -222,7 +222,7 @@ export const OWNER_NAV_DATA = {
       x: 322,
       y: 325,
       actionType: "sofa",
-      wait: 6000,
+      wait: 3000,
     },
     {
       id: "act_4",
@@ -230,7 +230,7 @@ export const OWNER_NAV_DATA = {
       x: 1373,
       y: 851,
       actionType: "toilet",
-      wait: 3000,
+      wait: 2500,
     },
     {
       id: "act_5",
@@ -238,7 +238,7 @@ export const OWNER_NAV_DATA = {
       x: 405,
       y: 836,
       actionType: "sleep",
-      wait: 10000,
+      wait: 7000,
     },
     {
       id: "act_6",

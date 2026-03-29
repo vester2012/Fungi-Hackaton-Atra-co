@@ -19,4 +19,13 @@ export class RageMeter {
   isMaxed() {
     return this.current >= this.max;
   }
+
+  getStage() {
+    const ratio = this.getProgress();
+
+    if (ratio >= 0.75) return 3;
+    if (ratio >= 0.5) return 2;
+    if (ratio >= 0.25) return 1;
+    return 0;
+  }
 }

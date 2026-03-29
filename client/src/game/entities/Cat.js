@@ -15,8 +15,12 @@ export class Cat {
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
       left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+      meow: Phaser.Input.Keyboard.KeyCodes.M,
     });
+
+    this.lastMeowAt = 0;
+    this.meowCooldownMs = 120;
 
     this.graphics = scene.add.graphics();
   }
@@ -46,7 +50,7 @@ export class Cat {
       this.x = Phaser.Math.Clamp(
         nextX,
         this.scene.mapBounds.x + this.size / 2,
-        this.scene.mapBounds.x + this.scene.mapBounds.width - this.size / 2
+        this.scene.mapBounds.x + this.scene.mapBounds.width - this.size / 2,
       );
     }
 
@@ -54,22 +58,36 @@ export class Cat {
       this.y = Phaser.Math.Clamp(
         nextY,
         this.scene.mapBounds.y + this.size / 2,
-        this.scene.mapBounds.y + this.scene.mapBounds.height - this.size / 2
+        this.scene.mapBounds.y + this.scene.mapBounds.height - this.size / 2,
       );
     }
 
+    this.tryMeow();
     this.redraw();
+  }
+
+  tryMeow() {
+    const now = this.scene.time.now;
+
+    if (!Phaser.Input.Keyboard.JustDown(this.keys.meow)) return;
+    if (now - this.lastMeowAt < this.meowCooldownMs) return;
+
+    this.lastMeowAt = now;
+    this.scene.onCatMeow?.(this.x, this.y, now);
   }
 
   redraw() {
     this.graphics.clear();
 
-    this.graphics.fillStyle(this.hide ? 0x86efac : 0x22c55e, this.hide ? 0.55 : 1);
+    this.graphics.fillStyle(
+      this.hide ? 0x86efac : 0x22c55e,
+      this.hide ? 0.55 : 1,
+    );
     this.graphics.fillRect(
       this.x - this.size / 2,
       this.y - this.size / 2,
       this.size,
-      this.size
+      this.size,
     );
 
     this.graphics.lineStyle(2, this.hide ? 0x166534 : 0x14532d, 1);
@@ -77,7 +95,7 @@ export class Cat {
       this.x - this.size / 2,
       this.y - this.size / 2,
       this.size,
-      this.size
+      this.size,
     );
   }
 }

@@ -10,6 +10,9 @@ import { INTERACTION_ZONES } from "../data/zones.js";
 import { OWNER_NAV_DATA } from "../data/ownerNavData.js";
 import { createZoneObject } from "../objects/createZoneObjects.js";
 
+import { VacuumNavigator } from "../entities/VacuumNavigator.js";
+import { VACUUM_ROUTE } from "../data/vacuumRouteData.js";
+
 const Phaser = window.Phaser;
 
 const COLLIDERS = [
@@ -471,6 +474,41 @@ const COLLIDERS = [
   },
 ];
 
+const EVIDENCE_ACTION_REGISTRY = {
+  computer_bite: {
+    type: "damage",
+    label: "Надкусанный монитор",
+  },
+  computer_type: {
+    type: "mess",
+    label: "Хаос на клавиатуре",
+  },
+  computer_water: {
+    type: "damage",
+    label: "Залитый водой компьютер",
+  },
+  plant_dig: {
+    type: "mess",
+    label: "Разрытый цветок",
+  },
+  trash_dig: {
+    type: "mess",
+    label: "Разбуренная мусорка",
+  },
+  curtains_scratch: {
+    type: "damage",
+    label: "Подранные шторы",
+  },
+  shoes_pee: {
+    type: "pee",
+    label: "Моча в обуви",
+  },
+  litter_dig: {
+    type: "mess",
+    label: "Разбуренный лоток",
+  },
+};
+
 export class MainScene extends Phaser.Scene {
   constructor() {
     super("MainScene");
@@ -512,6 +550,23 @@ export class MainScene extends Phaser.Scene {
     this.actionInProgress = null;
     this.lastStatusMessage = "";
 
+    this.roundDurationMs = 60000;
+    this.roundStartedAt = this.time.now;
+    this.roundEndsAt = this.roundStartedAt + this.roundDurationMs;
+
+    this.maxCatCaught = 3;
+    this.catCaughtCount = 0;
+    this.roundState = "playing"; // playing | win | lose
+
+    this.catCaughtUntil = 0;
+    this.catHomeSpawn = {
+      x: this.mapBounds.x + 260,
+      y: this.mapBounds.y + 360,
+    };
+
+    this.poopPromptStarted = false;
+    this.poopPromptAt = this.roundStartedAt + 25000;
+
     this.collisionGraphics = this.add.graphics();
     this.zoneGraphics = this.add.graphics();
     this.progressGraphics = this.add.graphics();
@@ -520,7 +575,7 @@ export class MainScene extends Phaser.Scene {
     this.redrawZones();
     this.createZoneLabels();
 
-    this.cat = new Cat(this, this.mapBounds.x + 260, this.mapBounds.y + 360);
+    this.cat = new Cat(this, this.catHomeSpawn.x, this.catHomeSpawn.y);
 
     const ownerStart = OWNER_NAV_DATA.actionPoints?.[0] ||
       OWNER_NAV_DATA.navPoints?.[0] || {
@@ -533,6 +588,18 @@ export class MainScene extends Phaser.Scene {
       ownerStart.x,
       ownerStart.y,
       OWNER_NAV_DATA,
+    );
+
+    const vacuumStart = VACUUM_ROUTE?.[0] || {
+      x: this.mapBounds.x + 500,
+      y: this.mapBounds.y + 500,
+    };
+
+    this.vacuum = new VacuumNavigator(
+      this,
+      vacuumStart.x,
+      vacuumStart.y,
+      VACUUM_ROUTE || [],
     );
 
     this.keys = this.input.keyboard.addKeys({
@@ -564,7 +631,7 @@ export class MainScene extends Phaser.Scene {
       .setDepth(100);
 
     this.statusText = this.add
-      .text(16, 190, "", {
+      .text(916, 0, "", {
         fontFamily: "Arial",
         fontSize: "16px",
         color: "#111827",
@@ -589,25 +656,133 @@ export class MainScene extends Phaser.Scene {
       .setVisible(false)
       .setDepth(201);
 
+    this.rageBarBg = this.add
+      .rectangle(420, 28, 420, 22, 0x0f172a, 0.95)
+      .setOrigin(0, 0.5)
+      .setDepth(110);
+
+    this.rageBarFill = this.add
+      .rectangle(420, 28, 0, 22, 0xef4444, 1)
+      .setOrigin(0, 0.5)
+      .setDepth(111);
+
+    this.rageBarLabel = this.add
+      .text(420, 6, "Выбешивание", {
+        fontFamily: "Arial",
+        fontSize: "16px",
+        color: "#fee2e2",
+        backgroundColor: "#7f1d1dcc",
+        padding: { left: 6, right: 6, top: 2, bottom: 2 },
+      })
+      .setDepth(112);
+
+    this.roundTimerText = this.add
+      .text(width - 16, 16, "", {
+        fontFamily: "Arial",
+        fontSize: "20px",
+        color: "#111827",
+        backgroundColor: "#ffffffdd",
+        padding: { left: 10, right: 10, top: 6, bottom: 6 },
+      })
+      .setOrigin(1, 0)
+      .setDepth(120);
+
+    this.endOverlay = this.add
+      .rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
+      .setDepth(500)
+      .setVisible(false);
+
+    this.endTitle = this.add
+      .text(width / 2, height / 2 - 80, "", {
+        fontFamily: "Arial",
+        fontSize: "54px",
+        color: "#f8fafc",
+        align: "center",
+      })
+      .setOrigin(0.5)
+      .setDepth(501)
+      .setVisible(false);
+
+    this.endStats = this.add
+      .text(width / 2, height / 2 + 10, "", {
+        fontFamily: "Arial",
+        fontSize: "26px",
+        color: "#e2e8f0",
+        align: "center",
+        lineSpacing: 10,
+      })
+      .setOrigin(0.5)
+      .setDepth(501)
+      .setVisible(false);
+
     this.updateHud();
   }
 
   update(_time, delta) {
+    if (this.roundState !== "playing") {
+      this.updateHud();
+      return;
+    }
+
     this.cat.update(delta);
     this.owner.update(this.time.now, delta);
-    this.catState.update(this.time.now);
 
+    if (this.vacuum) {
+      this.vacuum.update(delta);
+    }
+
+    this.catState.update(this.time.now);
+    this.evidenceSystem.update(this.time.now);
+
+    if (this.catCaughtUntil > 0 && this.time.now >= this.catCaughtUntil) {
+      this.catCaughtUntil = 0;
+      this.catState.setBusy(false);
+    }
+
+    this.updatePoopPrompt();
     this.refreshHideState();
     this.resolveAutoNeeds();
+    this.updateVacuumPoopInteraction();
 
     this.currentZone = this.getCurrentZone();
     this.currentActions = this.currentZone
-      ? this.currentZone.getAvailableActions(this.catState, this.ownerState)
+      ? [
+          ...this.currentZone.getAvailableActions(
+            this.catState,
+            this.ownerState,
+          ),
+        ]
       : [];
+
+    const isInLitterBox = this.currentZone?.id === "litterbox";
+
+    if (
+      this.catState.poopPending &&
+      this.catState.canPoop &&
+      !this.catState.hasPooped &&
+      !isInLitterBox
+    ) {
+      this.currentActions.push({
+        id: "cat_poop",
+        label: "Покакать",
+        durationMs: 1200,
+      });
+    }
 
     this.handleActionInput();
     this.updateActionProgress();
+    this.updateRoundState();
     this.updateHud();
+  }
+
+  updatePoopPrompt() {
+    if (this.poopPromptStarted) return;
+    if (this.roundState !== "playing") return;
+    if (this.time.now < this.poopPromptAt) return;
+
+    this.poopPromptStarted = true;
+    this.catState.schedulePoop(this.time.now, 0, 15000);
+    this.lastStatusMessage = "Кот захотел какать! Есть 15 секунд.";
   }
 
   refreshHideState() {
@@ -620,7 +795,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   resolveAutoNeeds() {
-    // авто-рвота
     if (this.catState.shouldAutoVomit(this.time.now)) {
       const zone = this.getCurrentZoneForAuto();
 
@@ -655,7 +829,6 @@ export class MainScene extends Phaser.Scene {
       this.lastStatusMessage = `Кота вырвало: ${label}`;
     }
 
-    // авто-попис
     if (this.catState.shouldAutoPee(this.time.now)) {
       this.catState.triggerAutoPee();
 
@@ -670,24 +843,88 @@ export class MainScene extends Phaser.Scene {
 
       this.lastStatusMessage = "Кот не выдержал и написал на пол.";
     }
+
+    if (this.catState.shouldAutoPoop(this.time.now)) {
+      const ok = this.catState.triggerAutoPoop();
+
+      if (ok) {
+        this.evidenceSystem.spawn({
+          type: "poop",
+          zoneId: "floor",
+          x: this.cat.x,
+          y: this.cat.y,
+          points: this.catState.getFloorPoopPoints(),
+          label: "Какашка на полу",
+          radius: 26,
+        });
+
+        this.lastStatusMessage = "Кот не выдержал и нагадил на пол.";
+      }
+    }
+  }
+
+  updateVacuumPoopInteraction() {
+    if (!this.vacuum) return;
+
+    const vacuumRect = this.vacuum.getBodyRect();
+    const poopItems = this.evidenceSystem.findByType("poop");
+
+    for (const poop of poopItems) {
+      const poopRect = {
+        x: poop.x - poop.radius,
+        y: poop.y - poop.radius,
+        width: poop.radius * 2,
+        height: poop.radius * 2,
+      };
+
+      if (!this.rectVsRect(vacuumRect, poopRect)) continue;
+
+      this.evidenceSystem.remove(poop.id);
+
+      this.evidenceSystem.spawn({
+        type: "poop_smeared",
+        zoneId: "vacuum_trail",
+        x: this.vacuum.x,
+        y: this.vacuum.y,
+        points: this.catState.getSmearedPoopPoints(),
+        label: "Размазанная какашка",
+        radius: 72,
+        expiresAt: this.time.now + 15000,
+      });
+
+      this.lastStatusMessage = "Пылесос размазал какашку!";
+      break;
+    }
   }
 
   handleActionInput() {
+    if (this.roundState !== "playing") return;
     if (this.actionInProgress) return;
-    if (!this.currentZone) return;
+    if (this.catCaughtUntil > this.time.now) return;
+
+    const hasGlobalPoopAction =
+      this.catState.poopPending &&
+      this.catState.canPoop &&
+      !this.catState.hasPooped;
+
+    if (!this.currentZone && !hasGlobalPoopAction) return;
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
       this.startActionByIndex(0);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action1))
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action1)) {
       this.startActionByIndex(0);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action2))
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action2)) {
       this.startActionByIndex(1);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action3))
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action3)) {
       this.startActionByIndex(2);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.action4))
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.action4)) {
       this.startActionByIndex(3);
+    }
   }
 
   startActionByIndex(index) {
@@ -719,8 +956,11 @@ export class MainScene extends Phaser.Scene {
       1,
     );
 
-    const x = Math.min(zone.x + 40, this.scale.width - 260);
-    const y = Math.max(zone.y - 54, 46);
+    const anchorX = zone ? zone.x : this.cat.x;
+    const anchorY = zone ? zone.y : this.cat.y;
+
+    const x = Math.min(anchorX + 40, this.scale.width - 260);
+    const y = Math.max(anchorY - 54, 46);
 
     this.progressGraphics.fillStyle(0x0f172a, 0.9);
     this.progressGraphics.fillRoundedRect(x, y, 220, 18, 8);
@@ -738,20 +978,52 @@ export class MainScene extends Phaser.Scene {
 
     const { zone, action } = this.actionInProgress;
 
+    if (action.id === "cat_poop") {
+      const used = this.catState.consumePoop();
+
+      if (used) {
+        this.evidenceSystem.spawn({
+          type: "poop",
+          zoneId: "floor",
+          x: this.cat.x,
+          y: this.cat.y,
+          points: this.catState.getFloorPoopPoints(),
+          label: "Какашка на полу",
+          radius: 26,
+        });
+
+        this.lastStatusMessage = "Кот нагадил на пол.";
+      } else {
+        this.lastStatusMessage = "Уже поздно какать.";
+      }
+
+      this.actionInProgress = null;
+      this.catState.setBusy(false);
+      return;
+    }
+
+    if (!zone) {
+      this.lastStatusMessage = "Нет подходящей зоны для действия.";
+      this.actionInProgress = null;
+      this.catState.setBusy(false);
+      return;
+    }
+
     const result = zone.applyAction(action.id, this.catState, this.ownerState, {
       now: this.time.now,
     });
 
     if (result.ok) {
-      // если это попис в обувь — это улика, а не мгновенные очки
-      if (action.id === "shoes_pee") {
+      const evidenceMeta = EVIDENCE_ACTION_REGISTRY[action.id];
+
+      if (evidenceMeta) {
         this.evidenceSystem.spawn({
-          type: "pee",
+          type: evidenceMeta.type,
           zoneId: zone.id,
           x: zone.x,
           y: zone.y,
           points: result.points,
-          label: "Моча в обуви",
+          label: evidenceMeta.label,
         });
 
         this.lastStatusMessage = result.message;
@@ -794,6 +1066,79 @@ export class MainScene extends Phaser.Scene {
     return this.getCurrentZone();
   }
 
+  updateRoundState() {
+    if (this.roundState !== "playing") return;
+
+    if (this.rageMeter.isMaxed()) {
+      this.roundState = "win";
+      this.showEndScreen(true);
+      return;
+    }
+
+    if (this.catCaughtCount >= this.maxCatCaught) {
+      this.roundState = "lose";
+      this.showEndScreen(false, "Хозяин слишком часто ловил кота");
+      return;
+    }
+
+    if (this.time.now >= this.roundEndsAt) {
+      this.roundState = "lose";
+      this.showEndScreen(false, "Время вышло");
+    }
+  }
+
+  showEndScreen(isWin, loseReason = "") {
+    this.endOverlay.setVisible(true);
+    this.endTitle.setVisible(true);
+    this.endStats.setVisible(true);
+
+    this.endTitle.setText(isWin ? "ПОБЕДА" : "ПОРАЖЕНИЕ");
+
+    const timeSpentSec = Math.floor(
+      (this.time.now - this.roundStartedAt) / 1000,
+    );
+
+    this.endStats.setText(
+      [
+        isWin ? "Хозяин доведен до пика." : loseReason,
+        `Выбешивание: ${this.rageMeter.current}/${this.rageMeter.max}`,
+        `Очки: ${this.score}`,
+        `Поимки кота: ${this.catCaughtCount}/${this.maxCatCaught}`,
+        `Время: ${timeSpentSec} сек`,
+      ].join("\n"),
+    );
+  }
+
+  onCatCaught() {
+    if (this.catCaughtUntil > this.time.now) return;
+    if (this.roundState !== "playing") return;
+
+    if (!this.catHomeSpawn) {
+      this.catHomeSpawn = {
+        x: this.mapBounds.x + 260,
+        y: this.mapBounds.y + 360,
+      };
+    }
+
+    this.catCaughtUntil = this.time.now + 1400;
+    this.catCaughtCount += 1;
+    this.catState.setBusy(true);
+
+    if (this.actionInProgress) {
+      this.actionInProgress = null;
+      this.progressGraphics.clear();
+    }
+
+    this.cat.x = this.catHomeSpawn.x;
+    this.cat.y = this.catHomeSpawn.y;
+
+    this.lastStatusMessage = `Хозяин поймал кота! (${this.catCaughtCount}/${this.maxCatCaught})`;
+  }
+
+  onCatMeow(x, y, now) {
+    this.owner?.hearMeow(x, y, now);
+  }
+
   updateHud() {
     this.scoreText.setText(
       `Очки: ${this.score}\nВыбешивание: ${this.rageMeter.current}/${this.rageMeter.max}`,
@@ -810,27 +1155,55 @@ export class MainScene extends Phaser.Scene {
       peeText = `может писать еще ${(this.catState.getPeeDeadlineTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
     }
 
+    let poopText = "used";
+    if (!this.poopPromptStarted) {
+      poopText = "нет";
+    } else if (this.catState.poopPending && !this.catState.canPoop) {
+      poopText = `через ${(this.catState.getPoopUnlockTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+    } else if (this.catState.poopPending && this.catState.canPoop) {
+      poopText = `${(this.catState.getPoopDeadlineTimeLeft(this.time.now) / 1000).toFixed(1)}с`;
+    }
+
     this.stateText.setText(
       [
         `hide: ${this.catState.hide ? "true" : "false"}`,
         `waterInMouth: ${this.catState.hasWaterInMouth ? "true" : "false"}`,
         `vomit: ${vomitText}`,
         `pee: ${peeText}`,
+        `poop: ${poopText}`,
         `owner: ${this.owner.state}`,
+        `ownerAction: ${this.owner.currentActionType || "none"}`,
+        `ownerAggro: ${this.ownerState.getAggressionLevel(this.rageMeter)}`,
+        `ownerSleeping: ${this.ownerState.isSleeping ? "true" : "false"}`,
+        `ownerWorking: ${this.ownerState.isWorking ? "true" : "false"}`,
+        `meowChain: ${this.owner.meowChainCount}/${this.owner.meowChainThreshold}`,
+        `caught: ${this.catCaughtCount}/${this.maxCatCaught}`,
       ].join("\n"),
     );
 
-    this.statusText.setText(this.lastStatusMessage || "WASD — ходить");
+    this.statusText.setText(
+      this.lastStatusMessage || "WASD — ходить, M — мяукать",
+    );
+
+    const rageProgress = this.rageMeter.getProgress();
+    this.rageBarFill.width = 420 * rageProgress;
+
+    const timeLeftMs = Math.max(0, this.roundEndsAt - this.time.now);
+    const timeLeftSec = Math.ceil(timeLeftMs / 1000);
+    this.roundTimerText.setText(`⏱ ${timeLeftSec}s`);
 
     this.updateActionMenu();
   }
 
   updateActionMenu() {
-    if (!this.currentZone) {
+    if (this.currentActions.length === 0) {
       this.menuBg.setVisible(false);
       this.menuText.setVisible(false);
       return;
     }
+
+    const anchorX = this.currentZone ? this.currentZone.x : this.cat.x;
+    const anchorY = this.currentZone ? this.currentZone.y : this.cat.y;
 
     const lines = this.currentActions.length
       ? this.currentActions.map(
@@ -839,10 +1212,11 @@ export class MainScene extends Phaser.Scene {
         )
       : ["Нет доступных действий"];
 
-    const text = `${this.currentZone.label}\n\n${lines.join("\n")}`;
+    const title = this.currentZone ? this.currentZone.label : "Кот";
+    const text = `${title}\n\n${lines.join("\n")}`;
 
-    const menuX = Math.min(this.currentZone.x + 50, this.scale.width - 340);
-    const menuY = Math.max(this.currentZone.y - 30, 70);
+    const menuX = Math.min(anchorX + 50, this.scale.width - 340);
+    const menuY = Math.max(anchorY - 30, 70);
 
     this.menuBg.setPosition(menuX, menuY);
     this.menuBg.setSize(320, 64 + lines.length * 28);
@@ -912,6 +1286,22 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  willCollideWithStatic(nextX, nextY, width, height) {
+    const rect = {
+      x: nextX - width / 2,
+      y: nextY - height / 2,
+      width,
+      height,
+    };
+
+    for (const c of this.colliders) {
+      if (c.type === "rect" && this.rectVsRect(rect, c)) return true;
+      if (c.type === "circle" && this.rectVsCircle(rect, c)) return true;
+    }
+
+    return false;
+  }
+
   willCollide(nextX, nextY, size) {
     const rect = {
       x: nextX - size / 2,
@@ -923,6 +1313,11 @@ export class MainScene extends Phaser.Scene {
     for (const c of this.colliders) {
       if (c.type === "rect" && this.rectVsRect(rect, c)) return true;
       if (c.type === "circle" && this.rectVsCircle(rect, c)) return true;
+    }
+
+    if (this.vacuum) {
+      const vacuumRect = this.vacuum.getBodyRect();
+      if (this.rectVsRect(rect, vacuumRect)) return true;
     }
 
     return false;

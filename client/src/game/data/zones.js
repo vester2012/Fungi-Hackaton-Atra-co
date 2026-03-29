@@ -1,127 +1,109 @@
 export const INTERACTION_ZONES = [
   {
-    "id": "plant",
-    "label": "Цветок",
-    "type": "ellipse",
-    "x": 1759,
-    "y": 416,
-    "width": 158,
-    "height": 158,
-    "actions": [
-      "Съесть",
-      "Раскопать"
-    ]
+    id: "plant",
+    label: "Цветок",
+    type: "ellipse",
+    x: 1759,
+    y: 416,
+    width: 158,
+    height: 158,
+    actions: ["Съесть", "Раскопать"],
   },
   {
-    "id": "bed",
-    "label": "Кровать",
-    "type": "ellipse",
-    "x": 346,
-    "y": 874,
-    "width": 348,
-    "height": 288,
-    "actions": [
-      "Наблевать",
-      "Помяукать"
-    ]
+    id: "bed",
+    label: "Кровать",
+    type: "ellipse",
+    x: 346,
+    y: 874,
+    width: 348,
+    height: 288,
+    actions: ["Наблевать", "Помяукать"],
   },
   {
-    "id": "trash",
-    "label": "Мусорка",
-    "type": "circle",
-    "x": 1026,
-    "y": 188,
-    "radius": 83,
-    "actions": [
-      "Покопаться"
-    ]
+    id: "trash",
+    label: "Мусорка",
+    type: "circle",
+    x: 1026,
+    y: 188,
+    radius: 83,
+    actions: ["Покопаться"],
   },
   {
-    "id": "curtain_left",
-    "label": "Шторы",
-    "type": "ellipse",
-    "x": 258,
-    "y": 65,
-    "width": 96,
-    "height": 176,
-    "actions": [
-      "Спрятаться",
-      "Подрать"
-    ]
+    id: "curtain_left",
+    label: "Шторы",
+    type: "ellipse",
+    x: 258,
+    y: 65,
+    width: 96,
+    height: 176,
+    actions: ["Спрятаться", "Подрать"],
   },
   {
-    "id": "curtain_right",
-    "label": "Шторы",
-    "type": "ellipse",
-    "x": 596,
-    "y": 42,
-    "width": 128,
-    "height": 208,
-    "actions": [
-      "Спрятаться",
-      "Подрать"
-    ]
+    id: "curtain_right",
+    label: "Шторы",
+    type: "ellipse",
+    x: 596,
+    y: 42,
+    width: 128,
+    height: 208,
+    actions: ["Спрятаться", "Подрать"],
   },
   {
-    "id": "water",
-    "label": "Стакан с водой",
-    "type": "circle",
-    "x": 1207,
-    "y": 201,
-    "radius": 60,
-    "actions": [
-      "Набрать в рот",
-      "Много попить"
-    ]
+    id: "water",
+    label: "Стакан с водой",
+    type: "circle",
+    x: 1207,
+    y: 201,
+    radius: 60,
+    actions: ["Набрать в рот", "Много попить"],
   },
   {
-    "id": "computer",
-    "label": "Комп",
-    "type": "ellipse",
-    "x": 617,
-    "y": 247,
-    "width": 208,
-    "height": 164,
-    "actions": [
-      "Укусить монитор",
-      "Печатать",
-      "Наблевать"
-    ]
+    id: "computer",
+    label: "Комп",
+    type: "ellipse",
+    x: 617,
+    y: 247,
+    width: 208,
+    height: 164,
+    actions: ["Укусить монитор", "Печатать", "Наблевать"],
   },
   {
-    "id": "table_1",
-    "label": "Стол",
-    "type": "ellipse",
-    "x": 341,
-    "y": 370,
-    "width": 164,
-    "height": 164,
-    "actions": [
-      "Запрыгнуть"
-    ]
+    id: "table_1",
+    label: "Стол",
+    type: "ellipse",
+    x: 341,
+    y: 370,
+    width: 164,
+    height: 164,
+    actions: ["Запрыгнуть"],
   },
   {
-    "id": "table_2",
-    "label": "Стол",
-    "type": "ellipse",
-    "x": 1283,
-    "y": 405,
-    "width": 270,
-    "height": 230,
-    "actions": [
-      "Запрыгнуть"
-    ]
+    id: "table_2",
+    label: "Стол",
+    type: "ellipse",
+    x: 1283,
+    y: 405,
+    width: 270,
+    height: 230,
+    actions: ["Запрыгнуть"],
   },
   {
-    "id": "shoes",
-    "label": "Обувь",
-    "type": "ellipse",
-    "x": 814,
-    "y": 999,
-    "width": 168,
-    "height": 138,
-    "actions": [
-      "Написать"
-    ]
-  }
+    id: "shoes",
+    label: "Обувь",
+    type: "ellipse",
+    x: 814,
+    y: 999,
+    width: 168,
+    height: 138,
+    actions: ["Написать"],
+  },
+  {
+    id: "litterbox",
+    label: "Лоток",
+    type: "ellipse",
+    x: 1540,
+    y: 990,
+    width: 130,
+    height: 130,
+  },
 ];
