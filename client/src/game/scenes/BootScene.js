@@ -25,7 +25,7 @@ export class BootScene extends Phaser.Scene {
         this.load.audio('bg-music', ['/assets/audio/bg-music.mp3', '/assets/audio/bg-music.ogg']);
 
         for (let i = 1; i <= 7; i++) {
-            this.load.image(`sky_layer_${i}`, `/assets/bg/bg_${i}.png`);
+            this.load.image(`sky_layer_${i}`, `/assets/bg/bg_${i}.webp`);
         }
         // this.load.json('map_1', '/assets/level_map.json');
     }

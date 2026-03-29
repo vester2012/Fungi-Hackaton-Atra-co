@@ -1,7 +1,12 @@
 import './style.css';
 import { io } from "socket.io-client";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 import { bootGame } from './game/bootGame.js';
 import {unit_manager} from "./game/unit_manager.js";
+
+import './style.css';
+import App from './App.jsx';
 
 const params = new URLSearchParams(window.location.search);
 const isDebug = params.has('debug');
@@ -51,15 +56,11 @@ if (isDebug) {
     });
 }
 
-async function startGame() {
-    if (document.fonts?.load) {
-        await document.fonts.load('16px "JungleAdventurer"');
-    }
-
-    bootGame('app');
-}
-
-startGame();
+ReactDOM.createRoot(document.getElementById('app')).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+);
 
 //* SOCKET *//
 
@@ -184,8 +185,15 @@ socket.on('hpUpdate', (data) => {
     const playerEntry = players[data.id];
     // Проверяем: есть ли запись, есть ли объект и не уничтожен ли он в Phaser
     if (playerEntry && playerEntry.obj && playerEntry.obj.active) {
+        const prevHp = typeof playerEntry.hp === 'number' ? playerEntry.hp : playerEntry.obj.getHp?.();
         playerEntry.hp = data.hp;
-        playerEntry.obj.setHp(data.hp);
+        if (typeof data.damage === 'number' && data.damage > 0 && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(data.damage, data.hp);
+        } else if (typeof prevHp === 'number' && data.hp < prevHp && playerEntry.obj.applySyncedDamage) {
+            playerEntry.obj.applySyncedDamage(prevHp - data.hp, data.hp);
+        } else {
+            playerEntry.obj.setHp(data.hp);
+        }
     }
 });
 
