@@ -27,6 +27,10 @@ export class TrashZone extends BaseZoneObject {
     return 18;
   }
 
+  getSpriteKey() {
+    return this.state.dug ? "trash_mess" : "trash_clean";
+  }
+
   resetMess() {
     this.state.dug = false;
   }

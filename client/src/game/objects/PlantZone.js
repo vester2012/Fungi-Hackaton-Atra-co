@@ -10,14 +10,17 @@ export class PlantZone extends BaseZoneObject {
   }
 
   getAvailableActions() {
-    return [
-      { id: "plant_eat", label: "Съесть", durationMs: 1800 },
-      { id: "plant_dig", label: "Раскопать", durationMs: 2200 },
-    ];
+    const actions = [{ id: "plant_eat", label: "Съесть", durationMs: 1800 }];
+
+    if (!this.state.dug) {
+      actions.push({ id: "plant_dig", label: "Раскопать", durationMs: 2200 });
+    }
+
+    return actions;
   }
 
   resetMess() {
-    this.dug = false;
+    this.state.dug = false;
   }
 
   applyAction(actionId, catState, _ownerState, context) {
@@ -34,6 +37,16 @@ export class PlantZone extends BaseZoneObject {
     }
 
     if (actionId === "plant_dig") {
+      if (this.state.dug) {
+        return {
+          ok: false,
+          points: 0,
+          durationMs: 0,
+          noise: 0,
+          message: "Цветок уже раскопан.",
+        };
+      }
+
       this.state.dug = true;
 
       return {

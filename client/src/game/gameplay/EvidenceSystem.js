@@ -4,7 +4,8 @@ export class EvidenceSystem {
   constructor(scene) {
     this.scene = scene;
     this.items = [];
-    this.graphics = scene.add.graphics();
+    this.graphics = scene.add.graphics().setDepth(118);
+    this.iconLayer = scene.add.layer().setDepth(119);
   }
 
   spawn({ type, zoneId, x, y, points, label, radius = 44, expiresAt = null }) {
@@ -19,6 +20,7 @@ export class EvidenceSystem {
       radius,
       seen: false,
       expiresAt,
+      displayObject: null,
     };
 
     this.items.push(item);
@@ -28,6 +30,14 @@ export class EvidenceSystem {
   }
 
   update(now) {
+    const expired = this.items.filter(
+      (item) => item.expiresAt && now >= item.expiresAt,
+    );
+
+    for (const item of expired) {
+      this.destroyDisplayObject(item);
+    }
+
     const before = this.items.length;
 
     this.items = this.items.filter((item) => {
@@ -41,8 +51,13 @@ export class EvidenceSystem {
   }
 
   remove(id) {
+    const item = this.items.find((i) => i.id === id);
+    if (item) {
+      this.destroyDisplayObject(item);
+    }
+
     const before = this.items.length;
-    this.items = this.items.filter((item) => item.id !== id);
+    this.items = this.items.filter((i) => i.id !== id);
 
     if (this.items.length !== before) {
       this.redraw();
@@ -74,6 +89,7 @@ export class EvidenceSystem {
         item.x,
         item.y,
       );
+
       if (dist <= owner.visionRadius) {
         result.push(item);
       }
@@ -90,45 +106,87 @@ export class EvidenceSystem {
     this.redraw();
   }
 
+  destroyDisplayObject(item) {
+    if (item.displayObject && item.displayObject.destroy) {
+      item.displayObject.destroy();
+    }
+    item.displayObject = null;
+  }
+
+  ensurePoopSprite(item) {
+    if (item.displayObject) {
+      item.displayObject.setPosition(item.x, item.y);
+      item.displayObject.setVisible(!item.seen);
+      return;
+    }
+
+    const sprite = this.scene.add.image(item.x, item.y, "poop_img");
+    sprite.setDepth(119);
+    sprite.setDisplaySize(30, 30);
+    sprite.setVisible(!item.seen);
+
+    this.iconLayer.add(sprite);
+    item.displayObject = sprite;
+  }
+
   redraw() {
     this.graphics.clear();
 
     for (const item of this.items) {
-      if (item.seen) continue;
-
-      let fillColor = 0xf97316;
-      let strokeColor = 0xea580c;
-
-      if (item.type === "pee") {
-        fillColor = 0xfacc15;
-        strokeColor = 0xca8a04;
+      if (item.type === "poop") {
+        this.ensurePoopSprite(item);
+      } else if (item.displayObject) {
+        this.destroyDisplayObject(item);
       }
 
-      if (item.type === "poop") {
-        fillColor = 0x8b5e3c;
-        strokeColor = 0x5c3b24;
+      if (item.seen) {
+        continue;
+      }
+
+      if (item.type === "pee") {
+        this.graphics.fillStyle(0xf3d34a, 0.95);
+        this.graphics.fillRoundedRect(item.x - 18, item.y - 10, 36, 20, 7);
+
+        this.graphics.lineStyle(2, 0xca8a04, 0.95);
+        this.graphics.strokeRoundedRect(item.x - 18, item.y - 10, 36, 20, 7);
+        continue;
+      }
+
+      if (item.type === "vomit") {
+        this.graphics.fillStyle(0x34a853, 0.95);
+        this.graphics.fillCircle(item.x, item.y, 14);
+
+        this.graphics.lineStyle(2, 0x1f7a35, 0.95);
+        this.graphics.strokeCircle(item.x, item.y, 14);
+        continue;
       }
 
       if (item.type === "poop_smeared") {
-        fillColor = 0x6b4423;
-        strokeColor = 0x3f2a16;
+        this.graphics.fillStyle(0x6b4423, 0.9);
+        this.graphics.fillRoundedRect(item.x - 34, item.y - 9, 68, 18, 8);
+
+        this.graphics.lineStyle(2, 0x3f2a16, 0.95);
+        this.graphics.strokeRoundedRect(item.x - 34, item.y - 9, 68, 18, 8);
+        continue;
       }
 
       if (item.type === "damage") {
-        fillColor = 0xef4444;
-        strokeColor = 0xb91c1c;
+        this.graphics.fillStyle(0xef4444, 0.22);
+        this.graphics.fillCircle(item.x, item.y, item.radius);
+
+        this.graphics.lineStyle(2, 0xb91c1c, 0.9);
+        this.graphics.strokeCircle(item.x, item.y, item.radius);
+        continue;
       }
 
       if (item.type === "mess") {
-        fillColor = 0xf97316;
-        strokeColor = 0xc2410c;
+        this.graphics.fillStyle(0xf97316, 0.22);
+        this.graphics.fillCircle(item.x, item.y, item.radius);
+
+        this.graphics.lineStyle(2, 0xc2410c, 0.9);
+        this.graphics.strokeCircle(item.x, item.y, item.radius);
+        continue;
       }
-
-      this.graphics.fillStyle(fillColor, 0.22);
-      this.graphics.fillCircle(item.x, item.y, item.radius);
-
-      this.graphics.lineStyle(2, strokeColor, 0.9);
-      this.graphics.strokeCircle(item.x, item.y, item.radius);
     }
   }
 }

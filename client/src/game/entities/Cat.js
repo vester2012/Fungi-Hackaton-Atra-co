@@ -22,11 +22,19 @@ export class Cat {
     this.lastMeowAt = 0;
     this.meowCooldownMs = 120;
 
-    this.graphics = scene.add.graphics();
+    this.isSpinningMove = false;
+    this.spinCooldownAfterStopMs = 500;
+    this.lastMoveInputAt = 0;
+    this.spinRotationSpeed = 720;
+
+    this.sprite = scene.add.sprite(this.x, this.y, "cat", "cat_idle.png");
+    this.sprite.setDepth(210);
+    this.sprite.setDisplaySize(64, 64);
   }
 
   update(delta) {
     const dt = delta / 1000;
+    const now = this.scene.time.now;
 
     let vx = 0;
     let vy = 0;
@@ -36,6 +44,27 @@ export class Cat {
       if (this.keys.right.isDown) vx += this.speed;
       if (this.keys.up.isDown) vy -= this.speed;
       if (this.keys.down.isDown) vy += this.speed;
+    }
+
+    const hasMoveInput = vx !== 0 || vy !== 0;
+
+    if (hasMoveInput) {
+      this.lastMoveInputAt = now;
+
+      if (!this.isSpinningMove) {
+        this.isSpinningMove = true;
+        this.sprite.play("cat-spin", true);
+        this.scene.onCatSpinStart?.();
+      }
+    } else if (
+      this.isSpinningMove &&
+      now - this.lastMoveInputAt >= this.spinCooldownAfterStopMs
+    ) {
+      this.isSpinningMove = false;
+      this.sprite.stop();
+      this.sprite.setTexture("cat", "cat_idle.png");
+      this.sprite.setAngle(0);
+      this.scene.onCatSpinStop?.();
     }
 
     if (vx !== 0 && vy !== 0) {
@@ -63,7 +92,7 @@ export class Cat {
     }
 
     this.tryMeow();
-    this.redraw();
+    this.redraw(delta);
   }
 
   tryMeow() {
@@ -76,26 +105,14 @@ export class Cat {
     this.scene.onCatMeow?.(this.x, this.y, now);
   }
 
-  redraw() {
-    this.graphics.clear();
+  redraw(delta) {
+    this.sprite.setPosition(this.x, this.y);
 
-    this.graphics.fillStyle(
-      this.hide ? 0x86efac : 0x22c55e,
-      this.hide ? 0.55 : 1,
-    );
-    this.graphics.fillRect(
-      this.x - this.size / 2,
-      this.y - this.size / 2,
-      this.size,
-      this.size,
-    );
+    // if (this.isSpinningMove) {
+    //   this.sprite.angle += this.spinRotationSpeed * (delta / 1000);
+    // }
 
-    this.graphics.lineStyle(2, this.hide ? 0x166534 : 0x14532d, 1);
-    this.graphics.strokeRect(
-      this.x - this.size / 2,
-      this.y - this.size / 2,
-      this.size,
-      this.size,
-    );
+    this.sprite.setAlpha(this.hide ? 0.55 : 1);
+    this.sprite.setTint(this.hide ? 0xb7f5c5 : 0xffffff);
   }
 }

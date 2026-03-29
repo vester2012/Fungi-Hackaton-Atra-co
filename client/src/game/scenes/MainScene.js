@@ -516,6 +516,14 @@ export class MainScene extends Phaser.Scene {
 
   preload() {
     this.load.image("apartment", "assets/apartment.png");
+    this.load.atlas("cat", "assets/cat_spin.png", "assets/cat_spin.json");
+    this.load.atlas("owner", "assets/owner.png", "assets/owner.json");
+    this.load.audio("oiia_loop", "assets/oiia_loop.mp3");
+
+    this.load.image("trash_clean", "assets/trash.png");
+    this.load.image("trash_mess", "assets/trash2.png");
+    this.load.image("water_glass", "assets/water.png");
+    this.load.image("poop_img", "assets/poop.png");
   }
 
   create() {
@@ -524,6 +532,38 @@ export class MainScene extends Phaser.Scene {
     this.debugMode = false;
 
     this.cameras.main.setBackgroundColor("#1e1e1e");
+
+    this.spinVisualActive = false;
+
+    this.spinFlashOverlay = this.add
+      .rectangle(width / 2, height / 2, width, height, 0xffffff, 0)
+      .setDepth(900)
+      .setScrollFactor(0);
+
+    this.spinFlashTween = null;
+
+    this.oiiaSound = this.sound.add("oiia_loop", {
+      volume: 0,
+      loop: true,
+    });
+
+    if (!this.anims.exists("cat-spin")) {
+      this.anims.create({
+        key: "cat-spin",
+        frames: [
+          { key: "cat", frame: "cat_spin_1.png" },
+          { key: "cat", frame: "cat_spin_2.png" },
+          { key: "cat", frame: "cat_spin_3.png" },
+          { key: "cat", frame: "cat_spin_4.png" },
+          { key: "cat", frame: "cat_spin_5.png" },
+          { key: "cat", frame: "cat_spin_6.png" },
+          { key: "cat", frame: "cat_spin_7.png" },
+          { key: "cat", frame: "cat_spin_8.png" },
+        ],
+        frameRate: 18,
+        repeat: -1,
+      });
+    }
 
     this.bg = this.add.image(width / 2, height / 2, "apartment");
 
@@ -540,6 +580,7 @@ export class MainScene extends Phaser.Scene {
 
     this.colliders = COLLIDERS;
     this.zoneObjects = INTERACTION_ZONES.map(createZoneObject);
+    this.createZoneSprites();
 
     this.catState = new CatState();
     this.ownerState = new OwnerState();
@@ -572,6 +613,8 @@ export class MainScene extends Phaser.Scene {
     this.collisionGraphics = this.add.graphics();
     this.zoneGraphics = this.add.graphics();
     this.progressGraphics = this.add.graphics();
+
+    this.messDecorGraphics = this.add.graphics().setDepth(85);
 
     this.redrawColliders();
     this.redrawZones();
@@ -619,6 +662,138 @@ export class MainScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  createZoneSprites() {
+    this.zoneSprites = [];
+
+    for (const zone of this.zoneObjects) {
+      if (zone.id === "trash") {
+        const sprite = this.add
+          .image(zone.x, zone.y, "trash_clean")
+          .setDepth(80);
+        sprite.setDisplaySize(72, 72);
+        this.zoneSprites.push({ zoneId: zone.id, sprite, type: "trash" });
+      }
+
+      if (zone.id === "water") {
+        const sprite = this.add
+          .image(zone.x, zone.y, "water_glass")
+          .setDepth(80);
+        sprite.setDisplaySize(48, 64);
+        this.zoneSprites.push({ zoneId: zone.id, sprite, type: "water" });
+      }
+    }
+  }
+
+  updateZoneSprites() {
+    if (!this.zoneSprites) return;
+
+    for (const item of this.zoneSprites) {
+      const zone =
+        this.getZoneById?.(item.zoneId) ||
+        this.zoneObjects.find((z) => z.id === item.zoneId);
+
+      if (!zone) continue;
+
+      if (item.type === "trash" && typeof zone.getSpriteKey === "function") {
+        item.sprite.setTexture(zone.getSpriteKey());
+      }
+    }
+  }
+
+  onCatSpinStart() {
+    this.spinVisualActive = true;
+
+    if (this.oiiaFadeOutTween) {
+      this.oiiaFadeOutTween.stop();
+      this.oiiaFadeOutTween = null;
+    }
+
+    if (!this.oiiaSound.isPlaying) {
+      this.oiiaSound.play();
+    }
+
+    this.tweens.killTweensOf(this.oiiaSound);
+    this.tweens.add({
+      targets: this.oiiaSound,
+      volume: 0.55,
+      duration: 160,
+      ease: "Sine.easeOut",
+    });
+
+    if (this.spinFlashTween) {
+      this.spinFlashTween.stop();
+    }
+
+    this.spinFlashTween = this.tweens.add({
+      targets: this.spinFlashOverlay,
+      alpha: { from: 0.02, to: 0.14 },
+      duration: 120,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  onCatSpinStop() {
+    this.spinVisualActive = false;
+
+    if (this.spinFlashTween) {
+      this.spinFlashTween.stop();
+      this.spinFlashTween = null;
+    }
+
+    this.tweens.killTweensOf(this.spinFlashOverlay);
+    this.tweens.add({
+      targets: this.spinFlashOverlay,
+      alpha: 0,
+      duration: 220,
+      ease: "Sine.easeOut",
+    });
+
+    this.tweens.killTweensOf(this.oiiaSound);
+    this.oiiaFadeOutTween = this.tweens.add({
+      targets: this.oiiaSound,
+      volume: 0,
+      duration: 260,
+      ease: "Sine.easeOut",
+      onComplete: () => {
+        if (this.oiiaSound?.isPlaying) {
+          this.oiiaSound.stop();
+        }
+      },
+    });
+  }
+
+  redrawMessDecor() {
+    this.messDecorGraphics.clear();
+
+    for (const zone of this.zoneObjects) {
+      if (zone.id === "litterbox" && zone.dug) {
+        this.drawScatterSquares(zone.x, zone.y, 46, 0xd8d1c6, 18, 5);
+      }
+
+      if (zone.id === "plant" && zone.state?.dug) {
+        this.drawScatterSquares(zone.x, zone.y, 42, 0x7a5a3a, 16, 5);
+      }
+    }
+  }
+
+  drawScatterSquares(cx, cy, spread, color, count = 14, size = 4) {
+    this.messDecorGraphics.fillStyle(color, 0.95);
+
+    for (let i = 0; i < count; i++) {
+      const ox = (i % 2 === 0 ? 1 : -1) * ((i * 13) % spread);
+      const oy = ((i * 9) % spread) - spread / 2;
+
+      this.messDecorGraphics.fillRect(
+        cx + ox - size / 2,
+        cy + oy - size / 2,
+        size,
+        size,
+      );
+    }
+  }
+
   update(_time, delta) {
     if (Phaser.Input.Keyboard.JustDown(this.keys.debug)) {
       this.debugMode = !this.debugMode;
@@ -629,6 +804,9 @@ export class MainScene extends Phaser.Scene {
       this.updateHud();
       return;
     }
+
+    this.updateSpinOverlay();
+    this.redrawMessDecor();
 
     this.cat.update(delta);
     this.owner.update(this.time.now, delta);
@@ -651,6 +829,7 @@ export class MainScene extends Phaser.Scene {
     this.refreshHideState();
     this.resolveAutoNeeds();
     this.updateVacuumPoopInteraction();
+    this.updateZoneSprites();
 
     this.currentZone = this.getCurrentZone();
     this.currentActions = this.currentZone
@@ -683,6 +862,21 @@ export class MainScene extends Phaser.Scene {
     this.updateHud();
   }
 
+  updateSpinOverlay() {
+    if (!this.spinVisualActive) return;
+
+    const pulse = 0.06 + 0.05 * Math.sin(this.time.now * 0.03);
+    this.spinFlashOverlay.setAlpha(pulse);
+
+    const flicker = Math.floor(245 + 10 * Math.sin(this.time.now * 0.04));
+    const color =
+      (flicker << 16) |
+      ((245 + Math.floor(8 * Math.sin(this.time.now * 0.05))) << 8) |
+      255;
+
+    this.spinFlashOverlay.fillColor = color;
+  }
+
   updateVacuumDirtyTrailNotice() {
     if (!this.vacuum || !this.owner) return;
     if (!this.vacuum.isDirtyTrailActive) return;
@@ -704,10 +898,7 @@ export class MainScene extends Phaser.Scene {
 
       this.rageMeter.add(35);
       this.ownerState.addAggression(1);
-      this.setStatusMessage(
-        "Хозяин заметил коричневый след от пылесоса!",
-        true,
-      );
+      this.setStatusMessage("Хозяин заметил след от пылесоса!", true);
       return;
     }
   }
@@ -1406,7 +1597,6 @@ export class MainScene extends Phaser.Scene {
       [
         isWin ? "Хозяин доведен до пика." : loseReason,
         `Выбешивание: ${this.rageMeter.current}/${this.rageMeter.max}`,
-        `Очки: ${this.score}`,
         `Поимки кота: ${this.catCaughtCount}/${this.maxCatCaught}`,
         `Время: ${timeSpentSec} сек`,
       ].join("\n"),

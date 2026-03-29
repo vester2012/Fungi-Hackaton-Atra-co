@@ -17,7 +17,7 @@ export class OwnerNavigator {
     this.actionPoints = navData?.actionPoints || [];
 
     this.state = "choose_target";
-    // choose_target | move | act | investigate | chase | search | return
+    // choose_target | move | act | investigate | chase | search | return | clean
 
     this.currentActionPoint = null;
     this.currentActionType = null;
@@ -30,6 +30,11 @@ export class OwnerNavigator {
     this.investigateUntil = 0;
     this.lastSeenCatPos = null;
     this.returnActionPoint = null;
+
+    this.cleanUntil = 0;
+    this.cleaningEvidenceId = null;
+    this.cleaningZoneId = null;
+    this.cleaningLabel = "";
 
     this.stuckTimer = 0;
     this.lastX = x;
@@ -44,6 +49,15 @@ export class OwnerNavigator {
     this.graphics = scene.add.graphics();
     this.pathGraphics = scene.add.graphics();
     this.visionGraphics = scene.add.graphics();
+
+    this.sprite = scene.add.sprite(
+      this.x,
+      this.y,
+      "owner",
+      "owner_default.png",
+    );
+    this.sprite.setDepth(215);
+    this.sprite.setDisplaySize(56, 56);
 
     this.actionLabel = scene.add
       .text(0, 0, "", {
@@ -79,6 +93,8 @@ export class OwnerNavigator {
       this.updateSearch(now, dt);
     } else if (this.state === "return") {
       this.updateReturn(now, dt);
+    } else if (this.state === "clean") {
+      this.updateClean(now);
     }
 
     this.redraw();
@@ -113,17 +129,58 @@ export class OwnerNavigator {
   }
 
   processVisibleEvidence() {
+    if (this.state === "clean") return;
+
     const visible = this.scene.evidenceSystem.getUnseenVisibleForOwner(this);
 
     for (const evidence of visible) {
       this.scene.evidenceSystem.markSeen(evidence.id);
       this.scene.rageMeter.add(evidence.points);
       this.scene.ownerState.addAggression(1);
-      this.scene.lastStatusMessage = `Хозяин увидел: ${evidence.label} (+${evidence.points})`;
+
+      this.startCleanState(evidence);
+      return;
     }
   }
 
+  startCleanState(evidence) {
+    this.returnActionPoint = this.currentActionPoint;
+    this.finishActionState();
+
+    this.path = [];
+    this.pathIndex = 0;
+
+    this.state = "clean";
+    this.cleanUntil = this.scene.time.now + 1800;
+    this.cleaningEvidenceId = evidence.id;
+    this.cleaningZoneId = evidence.zoneId || null;
+    this.cleaningLabel = evidence.label || "пакость";
+
+    this.scene.setStatusMessage?.(
+      `Хозяин убирает: ${this.cleaningLabel}`,
+      true,
+    );
+  }
+
+  updateClean(now) {
+    if (now < this.cleanUntil) return;
+
+    this.scene.handleOwnerCleanup?.(
+      this.cleaningEvidenceId,
+      this.cleaningZoneId,
+      this.cleaningLabel,
+    );
+
+    this.cleaningEvidenceId = null;
+    this.cleaningZoneId = null;
+    this.cleaningLabel = "";
+
+    this.startReturn();
+  }
+
   trySeeCat(now) {
+    if (this.state === "clean") return;
+
     const cat = this.scene.cat;
     const catState = this.scene.catState;
 
@@ -146,7 +203,13 @@ export class OwnerNavigator {
   }
 
   hearMeow(x, y, now) {
-    if (this.state === "chase" || this.state === "search") return;
+    if (
+      this.state === "chase" ||
+      this.state === "search" ||
+      this.state === "clean"
+    ) {
+      return;
+    }
 
     if (now - this.lastHeardMeowAt > this.meowChainResetMs) {
       this.meowChainCount = 0;
@@ -552,6 +615,7 @@ export class OwnerNavigator {
     // if (this.state === "chase") return "Гонится";
     // if (this.state === "search") return "Ищет кота";
     // if (this.state === "return") return "Возвращается";
+    if (this.state === "clean") return "Убирает";
 
     switch (this.currentActionType) {
       case "computer":
@@ -569,36 +633,33 @@ export class OwnerNavigator {
     }
   }
 
-  getActionColor() {
-    if (this.state === "investigate") return 0xf59e0b;
-    if (this.state === "chase") return 0xdc2626;
-    if (this.state === "search") return 0xf59e0b;
-    if (this.state === "return") return 0x0284c7;
-
-    switch (this.currentActionType) {
-      case "computer":
-        return 0x2563eb;
-      case "sofa":
-        return 0x7c3aed;
-      case "toilet":
-        return 0x0891b2;
-      case "sleep":
-        return 0x475569;
-      case "fridge":
-        return 0x16a34a;
-      default:
-        return 0x2563eb;
+  getOwnerFrameName() {
+    if (this.state === "clean") {
+      return "owner_clean.png";
     }
+
+    if (this.state === "chase" || this.state === "search") {
+      return "owner_angry.png";
+    }
+
+    const aggressionLevel = this.scene.ownerState.getAggressionLevel(
+      this.scene.rageMeter,
+    );
+
+    if (aggressionLevel <= 0 && this.currentActionType === "sofa") {
+      return "owner_happy.png";
+    }
+
+    if (aggressionLevel >= 2) {
+      return "owner_angry.png";
+    }
+
+    return "owner_default.png";
   }
 
   redraw() {
     this.graphics.clear();
     this.pathGraphics.clear();
-
-    if (!this.visionGraphics) {
-      this.visionGraphics = this.scene.add.graphics();
-    }
-
     this.visionGraphics.clear();
 
     if (
@@ -631,13 +692,8 @@ export class OwnerNavigator {
       this.visionGraphics.strokeCircle(this.x, this.y, this.visionRadius);
     }
 
-    const fillColor = this.getActionColor();
-
-    this.graphics.fillStyle(fillColor, 1);
-    this.graphics.fillRect(this.x - 15, this.y - 15, 30, 30);
-
-    this.graphics.lineStyle(2, 0x1e3a8a, 1);
-    this.graphics.strokeRect(this.x - 15, this.y - 15, 30, 30);
+    this.sprite.setPosition(this.x, this.y);
+    this.sprite.setTexture("owner", this.getOwnerFrameName());
 
     const actionName = this.getActionDisplayName();
 
