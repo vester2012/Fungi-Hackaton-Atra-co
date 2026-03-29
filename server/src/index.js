@@ -61,9 +61,12 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
+
+const PORT = Number(process.env.PORT || 3000);
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`Сервер запущен на http://${HOST}:${PORT}`);
 });
 
 // import http from 'node:http';
